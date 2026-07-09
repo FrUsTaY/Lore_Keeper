@@ -1,9 +1,12 @@
 import pytesseract
+import os
 
 class OCREngine:
-    def __init__(self, use_gpu=False):
+    def __init__(self, use_gpu=False, tesseract_path=None):
         # pytesseract runs on CPU; use_gpu is kept for backward compatibility
         self.last_text = []
+        if tesseract_path and os.path.exists(tesseract_path):
+            pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
     def extract_text(self, image_np):
         """

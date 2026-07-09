@@ -20,7 +20,12 @@ class TriggerManager:
         self.screencap = ScreenCapture()
         self.roi_detector = ROIDetector()
         self.buffer = RingBuffer(max_size=self.config.get("ring_buffer_size", 30))
-        self.ocr = OCREngine(use_gpu=False)
+
+        # Load LM studio config just to get tesseract_path for now
+        from src.config_manager import ConfigManager
+        cm = ConfigManager()
+        tesseract_path = cm.get("tesseract_path", "")
+        self.ocr = OCREngine(use_gpu=False, tesseract_path=tesseract_path)
         self.logger = EventLogger()
 
         self.is_running = False
@@ -72,6 +77,14 @@ class TriggerManager:
                     text = " ".join(lines)
                     print(f"[OCR] {text}")
                     self.logger.log_event(timestamp, text)
+
+                    # Save screenshot for debugging
+                    import cv2
+                    import os
+                    os.makedirs("outputs/screenshots", exist_ok=True)
+                    # use HHMMSS from timestamp to avoid invalid chars
+                    time_str = timestamp.split("T")[-1].replace(":", "")[:6]
+                    cv2.imwrite(f"outputs/screenshots/scr_{time_str}.jpg", img)
 
                 # Sleep active interval
                 sleep_time = self.active_interval - (time.time() - start_time)
