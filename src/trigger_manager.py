@@ -23,8 +23,8 @@ class TriggerManager:
 
         # Load LM studio config just to get tesseract_path for now
         from src.config_manager import ConfigManager
-        cm = ConfigManager()
-        tesseract_path = cm.get("tesseract_path", "")
+        self.cm = ConfigManager()
+        tesseract_path = self.cm.get("tesseract_path", "")
         self.ocr = OCREngine(use_gpu=False, tesseract_path=tesseract_path)
         self.logger = EventLogger()
 
@@ -78,13 +78,16 @@ class TriggerManager:
                     print(f"[OCR] {text}")
                     self.logger.log_event(timestamp, text)
 
-                    # Save screenshot for debugging
-                    import cv2
-                    import os
-                    os.makedirs("outputs/screenshots", exist_ok=True)
-                    # use HHMMSS from timestamp to avoid invalid chars
-                    time_str = timestamp.split("T")[-1].replace(":", "")[:6]
-                    cv2.imwrite(f"outputs/screenshots/scr_{time_str}.jpg", img)
+                    # Save screenshot if enabled in config
+                    save_screenshots = self.cm.get("save_screenshots", True)
+                    if save_screenshots:
+                        import cv2
+                        import os
+                        screenshots_path = self.cm.get("screenshots_path", "outputs/screenshots")
+                        os.makedirs(screenshots_path, exist_ok=True)
+                        # use HHMMSS from timestamp to avoid invalid chars
+                        time_str = timestamp.split("T")[-1].replace(":", "")[:6]
+                        cv2.imwrite(os.path.join(screenshots_path, f"scr_{time_str}.jpg"), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
                 # Sleep active interval
                 sleep_time = self.active_interval - (time.time() - start_time)
