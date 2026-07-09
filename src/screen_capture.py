@@ -6,17 +6,18 @@ import imagehash
 
 class ScreenCapture:
     def __init__(self):
-        self.sct = mss.mss()
+        pass
 
     def grab_screen(self):
         """Grabs the primary screen."""
-        monitor = self.sct.monitors[1] # Primary monitor
-        sct_img = self.sct.grab(monitor)
-        # Convert to BGR for cv2 if needed, but returning RGB numpy array is standard
-        img = np.array(sct_img)
-        # Drop alpha channel
-        img = img[:, :, :3]
-        return img
+        with mss.mss() as sct:
+            monitor = sct.monitors[1] # Primary monitor
+            sct_img = sct.grab(monitor)
+            # Convert to BGR for cv2 if needed, but returning RGB numpy array is standard
+            img = np.array(sct_img)
+            # Drop alpha channel
+            img = img[:, :, :3]
+            return img
 
     def compute_hash(self, image_np):
         """Computes perceptual hash of a numpy image."""

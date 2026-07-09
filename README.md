@@ -27,7 +27,7 @@
 2. Установите зависимости:
    ```bash
    pip install -r requirements.txt
-   python -m spacy download ru_core_news_sm
+   pip install "https://github.com/explosion/spacy-models/releases/download/ru_core_news_sm-3.7.0/ru_core_news_sm-3.7.0-py3-none-any.whl"
    ```
 3. Запустите приложение:
    ```bash
