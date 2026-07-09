@@ -18,7 +18,8 @@ class ConfigManager:
                 "temperature": 0.8,
                 "max_tokens": 1500,
                 "timeout": 120,
-                "genre": "fantasy"
+                "genre": "fantasy",
+                "tesseract_path": r"C:\Program Files\Tesseract-OCR\tesseract.exe"
             }
 
     def save_config(self, new_config):

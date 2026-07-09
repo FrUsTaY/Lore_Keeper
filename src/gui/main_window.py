@@ -28,6 +28,9 @@ class SettingsDialog(QDialog):
         self.genre_combo.setCurrentText(self.config_manager.get("genre", "fantasy"))
         layout.addRow("Жанр по умолчанию:", self.genre_combo)
 
+        self.tesseract_input = QLineEdit(self.config_manager.get("tesseract_path", r"C:\Program Files\Tesseract-OCR\tesseract.exe"))
+        layout.addRow("Путь к Tesseract:", self.tesseract_input)
+
         save_btn = QPushButton("Сохранить")
         save_btn.clicked.connect(self.save_settings)
         layout.addRow("", save_btn)
@@ -36,6 +39,7 @@ class SettingsDialog(QDialog):
         config = self.config_manager.config
         config["api_url"] = self.url_input.text()
         config["genre"] = self.genre_combo.currentText()
+        config["tesseract_path"] = self.tesseract_input.text()
         self.config_manager.save_config(config)
         self.accept()
 
