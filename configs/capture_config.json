@@ -1,0 +1,9 @@
+{
+  "capture_interval": 0.2,
+  "active_capture_interval": 1.0,
+  "hash_threshold": 0.1,
+  "stability_time": 2.0,
+  "ring_buffer_size": 30,
+  "roi_rect": null,
+  "schema_version": 1
+}
