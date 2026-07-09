@@ -17,7 +17,7 @@ def build():
         "--windowed",
         "--add-data", "configs:configs",
         "--hidden-import", "PySide6",
-        "--hidden-import", "pytesseract",
+        "--hidden-import", "easyocr",
         "--hidden-import", "spacy",
         "--hidden-import", "rapidfuzz",
         "--name", "LoreKeeper",

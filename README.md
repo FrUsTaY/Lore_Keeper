@@ -12,7 +12,6 @@
 ## Требования
 - Python 3.11/3.12
 - Установленные зависимости из `requirements.txt`
-- Установленный **Tesseract OCR** с поддержкой русского (`rus`) и английского (`eng`) языков (и добавленный в системную переменную PATH).
 - Установленная и запущенная программа **LM Studio** с загруженной моделью (например, Qwen2.5 или Mistral).
 
 ## Настройка LM Studio
@@ -24,17 +23,13 @@
 
 ## Установка и запуск
 
-1. Установите **Tesseract OCR**:
-   - [Скачать инсталлятор для Windows](https://github.com/UB-Mannheim/tesseract/wiki)
-   - При установке убедитесь, что выбраны пакеты для русского и английского языков.
-   - Обязательно добавьте путь к Tesseract (обычно `C:\Program Files\Tesseract-OCR`) в системную переменную PATH.
-2. Склонируйте репозиторий.
-3. Установите зависимости:
+1. Склонируйте репозиторий.
+2. Установите зависимости:
    ```bash
    pip install -r requirements.txt
    pip install "https://github.com/explosion/spacy-models/releases/download/ru_core_news_sm-3.7.0/ru_core_news_sm-3.7.0-py3-none-any.whl"
    ```
-4. Запустите приложение:
+3. Запустите приложение:
    ```bash
    python main.py
    ```
