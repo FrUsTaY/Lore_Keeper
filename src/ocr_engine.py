@@ -1,21 +1,22 @@
-import pytesseract
+import easyocr
 
 class OCREngine:
     def __init__(self, use_gpu=False):
-        # pytesseract runs on CPU; use_gpu is kept for backward compatibility
+        # easyocr is heavy; we use CPU mode by default as per requirements.
+        # Loads models into memory.
+        self.reader = easyocr.Reader(['ru', 'en'], gpu=use_gpu)
         self.last_text = []
 
     def extract_text(self, image_np):
         """
         Extracts text from the given image (which could be an ROI).
         """
-        # pytesseract can process numpy arrays directly
-        # lang='rus+eng' uses Russian and English language packs
-        raw_text = pytesseract.image_to_string(image_np, lang='rus+eng')
+        # easyocr expects RGB or BGR, numpy array is fine
+        results = self.reader.readtext(image_np)
 
         extracted_lines = []
-        for line in raw_text.split('\n'):
-            text = line.strip()
+        for (bbox, text, prob) in results:
+            text = text.strip()
             # Simple post-processing: filter out very short noise
             if len(text) >= 3:
                 extracted_lines.append(text)
