@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from src.config_manager import ConfigManager
 from src.lm_studio_client import LMStudioClient
+from src.huggingface_client import HuggingFaceClient
 from src.prompt_builder import PromptBuilder
 from src.deduplicator import Deduplicator
 from src.entity_extractor import EntityExtractor
@@ -10,14 +11,24 @@ from src.context_selector import ContextSelector
 class StoryGenerator:
     def __init__(self, config_manager=None):
         self.config_manager = config_manager or ConfigManager()
-        self.client = LMStudioClient(self.config_manager)
+        provider = self.config_manager.get("llm_provider", "LM Studio")
+
+        if provider == "Hugging Face":
+            self.client = HuggingFaceClient(self.config_manager)
+        else:
+            self.client = LMStudioClient(self.config_manager)
+
         self.builder = PromptBuilder()
         self.deduplicator = Deduplicator()
         self.extractor = EntityExtractor()
 
     def generate_story_from_log(self, log_path, output_path=None, genre=None, max_events=100, entities_context=""):
+        provider = self.config_manager.get("llm_provider", "LM Studio")
         if not self.client.check_health():
-            raise Exception("LM Studio недоступна. Пожалуйста, запустите сервер.")
+            if provider == "Hugging Face":
+                raise Exception("Hugging Face API недоступен или неверный токен.")
+            else:
+                raise Exception("LM Studio недоступна. Пожалуйста, запустите сервер.")
 
         events = self.builder.load_events_from_log(log_path)
 
@@ -34,7 +45,8 @@ class StoryGenerator:
 
         messages = self.builder.build_messages(events, genre, entities_context)
 
-        print("Отправка запроса в LM Studio...")
+        provider = self.config_manager.get("llm_provider", "LM Studio")
+        print(f"Отправка запроса в {provider}...")
         story_text = self.client.generate(messages)
 
         if not output_path:

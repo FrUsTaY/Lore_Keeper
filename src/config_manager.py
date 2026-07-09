@@ -19,7 +19,12 @@ class ConfigManager:
                 "max_tokens": 1500,
                 "timeout": 120,
                 "genre": "fantasy",
-                "tesseract_path": r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+                "tesseract_path": r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                "save_screenshots": True,
+                "screenshots_path": "outputs/screenshots",
+                "llm_provider": "LM Studio",
+                "hf_token": "",
+                "hf_model": "mistralai/Mistral-7B-Instruct-v0.2"
             }
 
     def save_config(self, new_config):

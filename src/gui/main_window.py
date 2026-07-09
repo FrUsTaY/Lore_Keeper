@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTabWidget, QTextEdit, QListWidget, QLabel, QStatusBar, QMessageBox,
-    QSystemTrayIcon, QMenu, QDialog, QFormLayout, QLineEdit, QComboBox, QSlider
+    QSystemTrayIcon, QMenu, QDialog, QFormLayout, QLineEdit, QComboBox, QSlider, QCheckBox
 )
 from PySide6.QtCore import Qt, Slot, QTimer
 from PySide6.QtGui import QIcon, QAction
@@ -20,8 +20,26 @@ class SettingsDialog(QDialog):
 
         layout = QFormLayout(self)
 
+        self.provider_combo = QComboBox()
+        self.provider_combo.addItems(["LM Studio", "Hugging Face"])
+        self.provider_combo.setCurrentText(self.config_manager.get("llm_provider", "LM Studio"))
+        self.provider_combo.currentTextChanged.connect(self.on_provider_changed)
+        layout.addRow("Провайдер LLM:", self.provider_combo)
+
         self.url_input = QLineEdit(self.config_manager.get("api_url"))
-        layout.addRow("LM Studio API URL:", self.url_input)
+        self.url_label = QLabel("LM Studio API URL:")
+        layout.addRow(self.url_label, self.url_input)
+
+        self.hf_token_input = QLineEdit(self.config_manager.get("hf_token", ""))
+        self.hf_token_input.setEchoMode(QLineEdit.Password)
+        self.hf_token_label = QLabel("Hugging Face Token:")
+        layout.addRow(self.hf_token_label, self.hf_token_input)
+
+        self.hf_model_input = QLineEdit(self.config_manager.get("hf_model", "mistralai/Mistral-7B-Instruct-v0.2"))
+        self.hf_model_label = QLabel("Hugging Face Model:")
+        layout.addRow(self.hf_model_label, self.hf_model_input)
+
+        self.on_provider_changed(self.provider_combo.currentText())
 
         self.genre_combo = QComboBox()
         self.genre_combo.addItems(["fantasy", "cyberpunk", "realism", "horror"])
@@ -31,15 +49,38 @@ class SettingsDialog(QDialog):
         self.tesseract_input = QLineEdit(self.config_manager.get("tesseract_path", r"C:\Program Files\Tesseract-OCR\tesseract.exe"))
         layout.addRow("Путь к Tesseract:", self.tesseract_input)
 
+        self.save_screenshots_cb = QCheckBox()
+        self.save_screenshots_cb.setChecked(self.config_manager.get("save_screenshots", True))
+        layout.addRow("Сохранять скриншоты:", self.save_screenshots_cb)
+
+        self.screenshots_path_input = QLineEdit(self.config_manager.get("screenshots_path", "outputs/screenshots"))
+        layout.addRow("Путь к скриншотам:", self.screenshots_path_input)
+
         save_btn = QPushButton("Сохранить")
         save_btn.clicked.connect(self.save_settings)
         layout.addRow("", save_btn)
 
+    def on_provider_changed(self, provider):
+        is_lm_studio = (provider == "LM Studio")
+
+        self.url_label.setVisible(is_lm_studio)
+        self.url_input.setVisible(is_lm_studio)
+
+        self.hf_token_label.setVisible(not is_lm_studio)
+        self.hf_token_input.setVisible(not is_lm_studio)
+        self.hf_model_label.setVisible(not is_lm_studio)
+        self.hf_model_input.setVisible(not is_lm_studio)
+
     def save_settings(self):
         config = self.config_manager.config
+        config["llm_provider"] = self.provider_combo.currentText()
         config["api_url"] = self.url_input.text()
+        config["hf_token"] = self.hf_token_input.text()
+        config["hf_model"] = self.hf_model_input.text()
         config["genre"] = self.genre_combo.currentText()
         config["tesseract_path"] = self.tesseract_input.text()
+        config["save_screenshots"] = self.save_screenshots_cb.isChecked()
+        config["screenshots_path"] = self.screenshots_path_input.text()
         self.config_manager.save_config(config)
         self.accept()
 

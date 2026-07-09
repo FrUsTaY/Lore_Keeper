@@ -12,15 +12,16 @@ class OCREngine:
         """
         Extracts text from the given image (which could be an ROI).
         """
-        # easyocr expects RGB or BGR, numpy array is fine
-        results = self.reader.readtext(image_np)
+        # Using pytesseract on numpy array (which is RGB by default here)
+        # Custom config to treat text as a single block or assume specific language
+        # psm 6 assumes a single uniform block of text.
+        text = pytesseract.image_to_string(image_np, lang='rus+eng', config='--psm 6')
 
         extracted_lines = []
-        for (bbox, text, prob) in results:
-            text = text.strip()
-            # Simple post-processing: filter out very short noise
-            if len(text) >= 3:
-                extracted_lines.append(text)
+        for line in text.split('\n'):
+            line = line.strip()
+            if len(line) >= 3:
+                extracted_lines.append(line)
 
         # Deduplicate identical consecutive reads for simple noise reduction
         if extracted_lines == self.last_text:
