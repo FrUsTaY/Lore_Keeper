@@ -253,6 +253,16 @@ class MainWindow(QMainWindow):
             self.text_story_view.setText(f"Ошибка загрузки: {e}")
 
     def start_recording(self):
+        tesseract_path = self.config_manager.get("tesseract_path", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+        if not os.path.exists(tesseract_path):
+            QMessageBox.critical(
+                self,
+                "Ошибка",
+                "Tesseract OCR не найден по указанному пути. "
+                "Пожалуйста, установите его и укажите правильный путь в настройках."
+            )
+            return
+
         self.btn_start.setEnabled(False)
         self.btn_stop.setEnabled(True)
         self.text_live_log.clear()
@@ -336,25 +346,3 @@ class MainWindow(QMainWindow):
             self.generation_worker.quit()
             self.generation_worker.wait()
         QApplication.quit()
-
-if __name__ == "__main__":
-    from PySide6.QtWidgets import QApplication
-    import sys
-    app = QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(False)
-
-    # QSS Styling (Dark Theme)
-    app.setStyleSheet("""
-        QMainWindow { background-color: #1e1e1e; color: #ffffff; }
-        QWidget { background-color: #1e1e1e; color: #ffffff; }
-        QPushButton { background-color: #333333; border: 1px solid #555555; padding: 5px; border-radius: 3px; }
-        QPushButton:hover { background-color: #444444; }
-        QPushButton:disabled { color: #777777; }
-        QTextEdit, QListWidget { background-color: #252526; border: 1px solid #333333; }
-        QTabBar::tab { background: #333333; padding: 8px; border: 1px solid #1e1e1e; }
-        QTabBar::tab:selected { background: #1e1e1e; }
-    """)
-
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())
