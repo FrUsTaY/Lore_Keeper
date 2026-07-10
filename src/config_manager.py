@@ -28,7 +28,9 @@ class ConfigManager:
             }
 
     def save_config(self, new_config):
+        import os
         self.config = new_config
+        os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
         with open(self.config_path, 'w', encoding='utf-8') as f:
             json.dump(self.config, f, indent=2)
 
