@@ -33,7 +33,7 @@ class HuggingFaceClient:
             except:
                 return False
 
-    def generate(self, messages):
+    def generate(self, messages, retries=3):
         """Sends a request to generate completion."""
         model = self.config.get("hf_model", "mistralai/Mistral-7B-Instruct-v0.2")
         token = self.config.get("hf_token", "")
@@ -61,32 +61,38 @@ class HuggingFaceClient:
             }
         }
 
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
-            response.raise_for_status()
-            data = response.json()
+        delay = 2
+        for attempt in range(retries):
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
+                response.raise_for_status()
+                data = response.json()
 
-            # Hugging Face might return a list of generated texts
-            if isinstance(data, list) and len(data) > 0 and 'generated_text' in data[0]:
-                return data[0]['generated_text']
-            elif isinstance(data, dict) and 'generated_text' in data:
-                return data['generated_text']
-            elif isinstance(data, dict) and 'error' in data:
-                raise Exception(f"Hugging Face Error: {data['error']}")
-            else:
-                return str(data)
+                # Hugging Face might return a list of generated texts
+                if isinstance(data, list) and len(data) > 0 and 'generated_text' in data[0]:
+                    return data[0]['generated_text']
+                elif isinstance(data, dict) and 'generated_text' in data:
+                    return data['generated_text']
+                elif isinstance(data, dict) and 'error' in data:
+                    raise Exception(f"Hugging Face Error: {data['error']}")
+                else:
+                    return str(data)
 
-        except requests.exceptions.RequestException as e:
-            # Try to get more info from response if possible
-            error_msg = str(e)
-            if hasattr(e, 'response') and e.response is not None:
-                try:
-                    error_data = e.response.json()
-                    if 'error' in error_data:
-                        error_msg = error_data['error']
-                except:
-                    pass
-            raise Exception(f"Hugging Face Error: {error_msg}")
+            except requests.exceptions.RequestException as e:
+                # Try to get more info from response if possible
+                error_msg = str(e)
+                if hasattr(e, 'response') and e.response is not None:
+                    try:
+                        error_data = e.response.json()
+                        if 'error' in error_data:
+                            error_msg = error_data['error']
+                    except:
+                        pass
+                if attempt == retries - 1:
+                    raise Exception(f"Hugging Face Error: {error_msg}")
+                print(f"Попытка {attempt+1} не удалась: {error_msg}. Повтор через {delay} сек...")
+                time.sleep(delay)
+                delay *= 2
 
     def _format_messages_to_prompt(self, messages):
         """Formats the list of messages into a single prompt string suitable for instruct models."""

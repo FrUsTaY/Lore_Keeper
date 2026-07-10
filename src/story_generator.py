@@ -7,6 +7,7 @@ from src.prompt_builder import PromptBuilder
 from src.deduplicator import Deduplicator
 from src.entity_extractor import EntityExtractor
 from src.context_selector import ContextSelector
+from src.utils.path_utils import get_path
 
 class StoryGenerator:
     def __init__(self, config_manager=None):
@@ -51,7 +52,7 @@ class StoryGenerator:
 
         if not output_path:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = f"outputs/stories/story_{timestamp}.md"
+            output_path = get_path(f"outputs/stories/story_{timestamp}.md")
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, 'w', encoding='utf-8') as f:

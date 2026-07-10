@@ -7,10 +7,11 @@ from src.ocr_engine import OCREngine
 from src.event_logger import EventLogger
 import json
 from rapidfuzz import fuzz
+from src.utils.path_utils import get_path
 
 class TriggerManager:
     def __init__(self, config_path="configs/capture_config.json"):
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(get_path(config_path), 'r', encoding='utf-8') as f:
             self.config = json.load(f)
 
         self.capture_interval = self.config.get("capture_interval", 0.2)
