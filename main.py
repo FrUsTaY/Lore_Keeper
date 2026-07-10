@@ -4,6 +4,7 @@ from src.gui.main_window import MainWindow
 
 def main():
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
 
     app.setStyleSheet("""
         QMainWindow { background-color: #1e1e1e; color: #ffffff; }

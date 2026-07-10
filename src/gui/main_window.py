@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Slot, QTimer
 from PySide6.QtGui import QIcon, QAction
+from PySide6.QtWidgets import QStyle
 import os
 
 from src.gui.workers import CaptureWorker, GenerationWorker
@@ -165,6 +166,14 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(self.tabs)
 
+        # Bottom layout for Exit button
+        bottom_layout = QHBoxLayout()
+        bottom_layout.addStretch()
+        self.btn_exit = QPushButton("Выход из программы")
+        self.btn_exit.clicked.connect(self.quit_app)
+        bottom_layout.addWidget(self.btn_exit)
+        main_layout.addLayout(bottom_layout)
+
         # Status bar
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
@@ -173,7 +182,7 @@ class MainWindow(QMainWindow):
     def setup_tray(self):
         self.tray_icon = QSystemTrayIcon(self)
         # Note: We need a real icon in a real app, using default empty icon for MVP
-        self.tray_icon.setIcon(QIcon())
+        self.tray_icon.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
 
         tray_menu = QMenu()
 
@@ -289,12 +298,16 @@ class MainWindow(QMainWindow):
         if self.capture_worker and self.capture_worker.is_running:
             self.capture_worker.stop()
             self.capture_worker.wait()
+        if self.generation_worker and self.generation_worker.isRunning():
+            self.generation_worker.quit()
+            self.generation_worker.wait()
         QApplication.quit()
 
 if __name__ == "__main__":
     from PySide6.QtWidgets import QApplication
     import sys
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
 
     # QSS Styling (Dark Theme)
     app.setStyleSheet("""
