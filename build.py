@@ -21,6 +21,7 @@ def build():
         "--hidden-import", "mss",
         "--hidden-import", "cv2",
         "--hidden-import", "PIL",
+        "--hidden-import", "Pillow",
         "--hidden-import", "imagehash",
         "--hidden-import", "requests",
         "--hidden-import", "pandas",

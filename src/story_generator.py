@@ -35,6 +35,10 @@ class StoryGenerator:
 
         # Apply Phase 4 Smart Improvements
         events = self.deduplicator.filter_similar_events(events)
+
+        if not events:
+            raise Exception("Лог пуст или не содержит значимых событий. Невозможно сгенерировать рассказ.")
+
         extracted_entities = self.extractor.extract_entities(events)
         if extracted_entities:
             entities_context = (entities_context + " " + extracted_entities).strip()

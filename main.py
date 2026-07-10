@@ -1,8 +1,11 @@
 import sys
 from PySide6.QtWidgets import QApplication
 from src.gui.main_window import MainWindow
+from src.utils.path_utils import ensure_required_directories
 
 def main():
+    ensure_required_directories()
+
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 

@@ -3,8 +3,11 @@ from src.utils.path_utils import get_path
 
 class ConfigManager:
     def __init__(self, config_path="configs/lm_studio_config.json"):
+        import os
         self.config_path = get_path(config_path)
         self.config = self.load_config()
+        if not os.path.exists(self.config_path):
+            self.save_config(self.config)
 
     def load_config(self):
         try:

@@ -82,6 +82,8 @@ class HuggingFaceClient:
                 # Try to get more info from response if possible
                 error_msg = str(e)
                 if hasattr(e, 'response') and e.response is not None:
+                    if e.response.status_code == 401:
+                        raise Exception("Hugging Face API Error: Invalid or missing token (401 Unauthorized).")
                     try:
                         error_data = e.response.json()
                         if 'error' in error_data:
