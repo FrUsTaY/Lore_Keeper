@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTabWidget, QTextEdit, QListWidget, QLabel, QStatusBar, QMessageBox,
-    QSystemTrayIcon, QMenu, QDialog, QFormLayout, QLineEdit, QComboBox, QSlider, QCheckBox
+    QSystemTrayIcon, QMenu, QDialog, QFormLayout, QLineEdit, QComboBox, QSlider, QCheckBox,
+    QApplication
 )
 from PySide6.QtCore import Qt, Slot, QTimer
 from PySide6.QtGui import QIcon, QAction
