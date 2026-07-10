@@ -29,8 +29,12 @@ class OCREngine:
         extracted_lines = []
         for line in text.split('\n'):
             line = line.strip()
-            if len(line) >= 3:
+            # Require at least one word with 3+ alphabetical characters to filter out noise like 'Ш л т ry _'
+            if len(line) >= 3 and re.search(r'[a-zA-Zа-яА-ЯёЁ]{3,}', line):
                 extracted_lines.append(line)
+
+        if not extracted_lines:
+            return []
 
         # Deduplicate consecutive reads using normalized text and fuzzy matching
         combined = " ".join(extracted_lines)

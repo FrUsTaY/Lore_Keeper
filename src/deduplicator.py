@@ -34,6 +34,11 @@ class Deduplicator:
             if len(text) < 4: # Drop very short noise
                 continue
 
+            # Filter out lines that don't contain at least one real word (3+ letters)
+            # This handles gibberish like 'Ш л т ry _' or '. Ё т. : a'
+            if not re.search(r'[a-zA-Zа-яА-ЯёЁ]{3,}', text):
+                continue
+
             norm_text = self.normalize_text(text)
 
             if not filtered:

@@ -91,6 +91,11 @@ class HuggingFaceClient:
                             error_msg = error_data['error']
                     except:
                         pass
+                elif isinstance(e, requests.exceptions.ConnectionError):
+                    error_msg = "Ошибка сети (ConnectionError). Не удалось подключиться к серверу Hugging Face. Если вы используете VPN, проверьте его настройки, либо сервер недоступен."
+                elif isinstance(e, requests.exceptions.Timeout):
+                    error_msg = "Превышено время ожидания ответа от сервера Hugging Face (Timeout)."
+
                 if attempt == retries - 1:
                     raise Exception(f"Hugging Face Error: {error_msg}")
                 print(f"Попытка {attempt+1} не удалась: {error_msg}. Повтор через {delay} сек...")
