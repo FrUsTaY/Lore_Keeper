@@ -1,6 +1,10 @@
 import os
+import sys
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if hasattr(sys, '_MEIPASS'):
+    PROJECT_ROOT = sys._MEIPASS
+else:
+    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def get_path(relative_path):
     return os.path.join(PROJECT_ROOT, relative_path)

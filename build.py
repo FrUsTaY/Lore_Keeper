@@ -28,6 +28,7 @@ def build():
         "--hidden-import", "numpy",
         "--hidden-import", "spacy",
         "--hidden-import", "rapidfuzz",
+        "--hidden-import", "src.huggingface_client",
         "--name", "LoreKeeper",
         "main.py"
     ]
