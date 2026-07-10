@@ -42,8 +42,18 @@ class ContextSelector:
         # Remove overlaps
         result = []
         seen = set()
-        for e in start_events + end_events:
-            # We can use timestamp as unique identifier for this run
+
+        # Add start events, deduplicating based on timestamp
+        actual_start_events_count = 0
+        for e in start_events:
+            ts = e.get('timestamp')
+            if ts not in seen:
+                seen.add(ts)
+                result.append(e)
+                actual_start_events_count += 1
+
+        # Add end events, deduplicating based on timestamp
+        for e in end_events:
             ts = e.get('timestamp')
             if ts not in seen:
                 seen.add(ts)
@@ -51,9 +61,8 @@ class ContextSelector:
 
         # Add a marker if we skipped events
         if len(result) < len(events):
-            # Insert a "..." event in the middle
-            mid_idx = len(start_events)
-            if mid_idx < len(result):
-                result.insert(mid_idx, {"timestamp": "", "text": "... [Часть событий пропущена] ..."})
+            # Insert a "..." event in the middle, exactly after the deduplicated start events
+            if actual_start_events_count < len(result):
+                result.insert(actual_start_events_count, {"timestamp": "", "text": "... [Часть событий пропущена] ..."})
 
         return result

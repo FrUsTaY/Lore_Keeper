@@ -1,10 +1,11 @@
 import json
 import os
 from datetime import datetime
+from src.utils.path_utils import get_path
 
 class SessionManager:
     def __init__(self, logs_dir="logs"):
-        self.logs_dir = logs_dir
+        self.logs_dir = get_path(logs_dir)
         os.makedirs(self.logs_dir, exist_ok=True)
         self.current_session_id = None
         self.current_events = []

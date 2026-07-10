@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTabWidget, QTextEdit, QListWidget, QLabel, QStatusBar, QMessageBox,
     QSystemTrayIcon, QMenu, QDialog, QFormLayout, QLineEdit, QComboBox, QSlider, QCheckBox,
-    QApplication
+    QApplication, QListWidgetItem
 )
 from PySide6.QtCore import Qt, Slot, QTimer
 from PySide6.QtGui import QIcon, QAction
@@ -12,6 +12,7 @@ import os
 from src.gui.workers import CaptureWorker, GenerationWorker
 from src.session_manager import SessionManager
 from src.config_manager import ConfigManager
+from src.utils.path_utils import get_path
 
 class SettingsDialog(QDialog):
     def __init__(self, config_manager, parent=None):
@@ -234,18 +235,20 @@ class MainWindow(QMainWindow):
         self.list_sessions.clear()
         sessions = self.session_manager.get_all_sessions()
         for s in sessions:
-            self.list_sessions.addItem(f"{s['id']} (Событий: {s['event_count']}) | {s['file']}")
+            item = QListWidgetItem(f"{s['id']} (Событий: {s['event_count']}) | {s['file']}")
+            item.setData(Qt.UserRole, s['file'])
+            self.list_sessions.addItem(item)
 
     def load_stories(self):
         self.list_stories.clear()
-        stories_dir = "outputs/stories"
+        stories_dir = get_path("outputs/stories")
         os.makedirs(stories_dir, exist_ok=True)
         for f in os.listdir(stories_dir):
             if f.endswith(".md"):
                 self.list_stories.addItem(f)
 
     def load_story_text(self, item):
-        filepath = os.path.join("outputs/stories", item.text())
+        filepath = os.path.join(get_path("outputs/stories"), item.text())
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 self.text_story_view.setText(f.read())
@@ -271,10 +274,16 @@ class MainWindow(QMainWindow):
         self.text_live_log.append(f"--- Начало сессии: {session_id} ---")
         self.tabs.setCurrentWidget(self.tab_live)
 
-        self.capture_worker = CaptureWorker(self.session_manager)
-        self.capture_worker.new_event.connect(self.on_new_event)
-        self.capture_worker.status_changed.connect(self.status_bar.showMessage)
-        self.capture_worker.start()
+        try:
+            self.capture_worker = CaptureWorker(self.session_manager)
+            self.capture_worker.new_event.connect(self.on_new_event)
+            self.capture_worker.status_changed.connect(self.status_bar.showMessage)
+            self.capture_worker.start()
+        except Exception as e:
+            self.btn_start.setEnabled(True)
+            self.btn_stop.setEnabled(False)
+            QMessageBox.critical(self, "Ошибка", f"Не удалось запустить запись:\n{str(e)}")
+            return
 
     def stop_recording(self):
         self.btn_start.setEnabled(True)
@@ -302,7 +311,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Внимание", "Выберите сессию для генерации")
             return
 
-        filepath = selected.text().split(" | ")[-1]
+        filepath = selected.data(Qt.UserRole)
 
         self.generation_worker = GenerationWorker(
             log_path=filepath,
