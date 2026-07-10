@@ -7,8 +7,10 @@ class Deduplicator:
         self.threshold = threshold
 
     def normalize_text(self, text):
-        """Removes extra spaces, punctuation, lowers case."""
+        """Removes extra spaces, punctuation, lowers case and numbers."""
         text = text.lower()
+        # Remove numbers to prevent changing timestamps/speeds from bypassing deduplication
+        text = re.sub(r'\d+', '', text)
         text = re.sub(r'[^\w\s]', '', text)
         text = re.sub(r'\s+', ' ', text).strip()
         return text

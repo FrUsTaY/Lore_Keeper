@@ -5,6 +5,8 @@ from rapidfuzz import fuzz
 
 def normalize_text(text):
     text = text.lower()
+    # Remove numbers to prevent changing timestamps/speeds from bypassing deduplication
+    text = re.sub(r'\d+', '', text)
     text = re.sub(r'[^\w\s]', '', text)
     return re.sub(r'\s+', ' ', text).strip()
 
