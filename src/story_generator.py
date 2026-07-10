@@ -43,7 +43,7 @@ class StoryGenerator:
 
         genre = genre or self.config_manager.get("genre", "fantasy")
 
-        messages = self.builder.build_messages(events, genre, entities_context)
+        messages = self.builder.build_messages(events, genre, entities_context, max_events=max_events)
 
         provider = self.config_manager.get("llm_provider", "LM Studio")
         print(f"Отправка запроса в {provider}...")

@@ -39,8 +39,8 @@ class PromptBuilder:
         prompt += "\nРассказ:"
         return prompt
 
-    def build_messages(self, events, genre, entities_context=""):
-        filtered_events = self.filter_events(events)
+    def build_messages(self, events, genre, entities_context="", max_events=100):
+        filtered_events = self.filter_events(events, max_events=max_events)
         system_prompt = self.build_system_prompt(genre, entities_context)
         user_prompt = self.build_user_prompt(filtered_events)
 
