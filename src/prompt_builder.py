@@ -40,9 +40,9 @@ class PromptBuilder:
         return prompt
 
     def build_messages(self, events, genre, entities_context="", max_events=100):
-        filtered_events = self.filter_events(events, max_events=max_events)
+        # We assume `events` is already filtered by ContextSelector
         system_prompt = self.build_system_prompt(genre, entities_context)
-        user_prompt = self.build_user_prompt(filtered_events)
+        user_prompt = self.build_user_prompt(events)
 
         return [
             {"role": "system", "content": system_prompt},

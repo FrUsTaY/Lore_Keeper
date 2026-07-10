@@ -13,7 +13,7 @@ class CaptureWorker(QThread):
         super().__init__()
         self.session_manager = session_manager
         # Override logger to intercept events
-        self.trigger_manager = TriggerManager()
+        self.trigger_manager = TriggerManager(session_id=self.session_manager.current_session_id)
 
         # We hook into the trigger manager's logger
         original_log = self.trigger_manager.logger.log_event

@@ -39,18 +39,20 @@ class ContextSelector:
             end_events.insert(0, e) # Keep chronological
             chars_accum += len(e.get('text', ''))
 
-        # Remove overlaps
+        # Remove overlaps and maintain the separation for the marker
         result = []
         seen = set()
 
         # Add start events, deduplicating based on timestamp
-        actual_start_events_count = 0
         for e in start_events:
             ts = e.get('timestamp')
             if ts not in seen:
                 seen.add(ts)
                 result.append(e)
-                actual_start_events_count += 1
+
+        # Add a marker if we skipped events
+        if len(result) < len(events) and end_events:
+            result.append({"timestamp": "", "text": "... [Часть событий пропущена] ..."})
 
         # Add end events, deduplicating based on timestamp
         for e in end_events:
@@ -58,11 +60,5 @@ class ContextSelector:
             if ts not in seen:
                 seen.add(ts)
                 result.append(e)
-
-        # Add a marker if we skipped events
-        if len(result) < len(events):
-            # Insert a "..." event in the middle, exactly after the deduplicated start events
-            if actual_start_events_count < len(result):
-                result.insert(actual_start_events_count, {"timestamp": "", "text": "... [Часть событий пропущена] ..."})
 
         return result

@@ -15,8 +15,8 @@ class ScreenCapture:
             sct_img = sct.grab(monitor)
             # Convert to BGR for cv2 if needed, but returning RGB numpy array is standard
             img = np.array(sct_img)
-            # Drop alpha channel
-            img = img[:, :, :3]
+            # Convert BGRA to RGB
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
             return img
 
     def compute_hash(self, image_np):

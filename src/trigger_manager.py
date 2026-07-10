@@ -10,7 +10,7 @@ from rapidfuzz import fuzz
 from src.utils.path_utils import get_path
 
 class TriggerManager:
-    def __init__(self, config_path="configs/capture_config.json"):
+    def __init__(self, config_path="configs/capture_config.json", session_id=None):
         with open(get_path(config_path), 'r', encoding='utf-8') as f:
             self.config = json.load(f)
 
@@ -28,7 +28,7 @@ class TriggerManager:
         self.cm = ConfigManager()
         tesseract_path = self.cm.get("tesseract_path", "")
         self.ocr = OCREngine(use_gpu=False, tesseract_path=tesseract_path)
-        self.logger = EventLogger()
+        self.logger = EventLogger(session_id=session_id)
 
         self.is_running = False
         self.mode = "BACKGROUND" # BACKGROUND or ACTIVE
@@ -112,8 +112,7 @@ class TriggerManager:
                     # Sleep background interval
                     sleep_time = self.capture_interval - (time.time() - start_time)
 
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
+                time.sleep(max(0, sleep_time))
 
                 consecutive_errors = 0
 
