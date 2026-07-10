@@ -188,7 +188,7 @@ class MainWindow(QMainWindow):
         tray_menu = QMenu()
 
         show_action = QAction("Показать окно", self)
-        show_action.triggered.connect(self.showNormal)
+        show_action.triggered.connect(self.restore_window)
         tray_menu.addAction(show_action)
 
         about_action = QAction("О программе", self)
@@ -200,7 +200,18 @@ class MainWindow(QMainWindow):
         tray_menu.addAction(quit_action)
 
         self.tray_icon.setContextMenu(tray_menu)
-        self.tray_icon.show()
+        self.tray_icon.activated.connect(self.on_tray_icon_activated)
+        # We start with the tray icon hidden because the main window is visible
+        self.tray_icon.hide()
+
+    def on_tray_icon_activated(self, reason):
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            self.restore_window()
+
+    def restore_window(self):
+        self.showNormal()
+        self.activateWindow()
+        self.tray_icon.hide()
 
     def show_about_dialog(self):
         QMessageBox.about(
@@ -309,6 +320,7 @@ class MainWindow(QMainWindow):
         # Override to minimize to tray
         event.ignore()
         self.hide()
+        self.tray_icon.show()
         self.tray_icon.showMessage(
             "Нарративный Архивариус",
             "Приложение свернуто в трей и продолжает работать в фоне.",
