@@ -191,12 +191,33 @@ class MainWindow(QMainWindow):
         show_action.triggered.connect(self.showNormal)
         tray_menu.addAction(show_action)
 
+        about_action = QAction("О программе", self)
+        about_action.triggered.connect(self.show_about_dialog)
+        tray_menu.addAction(about_action)
+
         quit_action = QAction("Выйти", self)
         quit_action.triggered.connect(self.quit_app)
         tray_menu.addAction(quit_action)
 
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.show()
+
+    def show_about_dialog(self):
+        QMessageBox.about(
+            self,
+            "О программе",
+            "<h3>Нарративный Архивариус (Lore Keeper)</h3>"
+            "<p>Это программа для автоматического создания красивых литературных дневников "
+            "и историй из ваших игровых сессий.</p>"
+            "<p><b>Как это работает:</b><br>"
+            "Вы запускаете запись сессии во время игры. Программа автоматически считывает важные "
+            "события (например, логи в играх, используя распознавание текста) и сохраняет их в "
+            "хронологическом порядке. Когда вы закончите, программа использует искусственный "
+            "интеллект, чтобы превратить эти сухие логи в увлекательную историю, которую "
+            "можно сохранить и прочитать в библиотеке.</p>"
+            "<p>Просто нажмите <b>Старт Записи</b>, играйте в любимую игру, а затем "
+            "сгенерируйте свою собственную уникальную историю!</p>"
+        )
 
     def load_sessions(self):
         self.list_sessions.clear()
