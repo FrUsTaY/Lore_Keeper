@@ -137,9 +137,16 @@ class MainWindow(QMainWindow):
         btn_generate = QPushButton("Сгенерировать историю из выбранной сессии")
         btn_generate.clicked.connect(self.start_generation)
 
+        btn_delete_session = QPushButton("Удалить выбранную сессию")
+        btn_delete_session.clicked.connect(self.delete_session)
+
+        sess_buttons_layout = QHBoxLayout()
+        sess_buttons_layout.addWidget(btn_generate)
+        sess_buttons_layout.addWidget(btn_delete_session)
+
         sess_layout.addWidget(QLabel("Сохраненные сессии:"))
         sess_layout.addWidget(self.list_sessions)
-        sess_layout.addWidget(btn_generate)
+        sess_layout.addLayout(sess_buttons_layout)
         self.tabs.addTab(self.tab_sessions, "Сессии")
 
         # Tab 2: Live Log
@@ -157,10 +164,17 @@ class MainWindow(QMainWindow):
         self.list_stories = QListWidget()
         self.list_stories.itemClicked.connect(self.load_story_text)
 
+        btn_delete_story = QPushButton("Удалить выбранную историю")
+        btn_delete_story.clicked.connect(self.delete_story)
+
+        story_list_layout = QVBoxLayout()
+        story_list_layout.addWidget(self.list_stories)
+        story_list_layout.addWidget(btn_delete_story)
+
         self.text_story_view = QTextEdit()
         self.text_story_view.setReadOnly(True)
 
-        stories_layout.addWidget(self.list_stories, 1)
+        stories_layout.addLayout(story_list_layout, 1)
         stories_layout.addWidget(self.text_story_view, 2)
 
         self.tabs.addTab(self.tab_stories, "Библиотека историй")
@@ -255,6 +269,32 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.text_story_view.setText(f"Ошибка загрузки: {e}")
 
+    def delete_story(self):
+        selected = self.list_stories.currentItem()
+        if not selected:
+            QMessageBox.warning(self, "Внимание", "Выберите историю для удаления")
+            return
+
+        filepath = os.path.join(get_path("outputs/stories"), selected.text())
+
+        reply = QMessageBox.question(
+            self,
+            "Подтверждение",
+            f"Вы уверены, что хотите удалить эту историю?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                self.load_stories()
+                self.text_story_view.clear()
+                self.status_bar.showMessage("История удалена", 3000)
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось удалить историю:\n{e}")
+
     def start_recording(self):
         tesseract_path = self.config_manager.get("tesseract_path", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
         if not os.path.exists(tesseract_path):
@@ -304,6 +344,31 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         dlg = SettingsDialog(self.config_manager, self)
         dlg.exec()
+
+    def delete_session(self):
+        selected = self.list_sessions.currentItem()
+        if not selected:
+            QMessageBox.warning(self, "Внимание", "Выберите сессию для удаления")
+            return
+
+        filepath = selected.data(Qt.UserRole)
+
+        reply = QMessageBox.question(
+            self,
+            "Подтверждение",
+            f"Вы уверены, что хотите удалить эту сессию?\n\nБудет удален только лог файл.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                self.load_sessions()
+                self.status_bar.showMessage("Сессия удалена", 3000)
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось удалить сессию:\n{e}")
 
     def start_generation(self):
         selected = self.list_sessions.currentItem()

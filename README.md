@@ -38,12 +38,20 @@
 ## Установка и запуск
 
 1. Склонируйте репозиторий.
-2. Установите зависимости:
+2. Рекомендуется создать независимое окружение. Создайте окружение (внутри папки проекта):
+   ```bash
+   python -m venv venv
+   ```
+3. Активируйте его:
+   ```powershell
+   .\venv\Scripts\Activate.ps1
+   ```
+4. Установите зависимости:
    ```bash
    pip install -r requirements.txt
    pip install "https://github.com/explosion/spacy-models/releases/download/ru_core_news_sm-3.7.0/ru_core_news_sm-3.7.0-py3-none-any.whl"
    ```
-3. Запустите приложение:
+5. Запустите приложение:
    ```bash
    python main.py
    ```
