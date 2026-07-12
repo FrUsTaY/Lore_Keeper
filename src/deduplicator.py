@@ -7,8 +7,10 @@ class Deduplicator:
         self.threshold = threshold
 
     def normalize_text(self, text):
-        """Removes extra spaces, punctuation, lowers case."""
+        """Removes extra spaces, punctuation, lowers case and numbers."""
         text = text.lower()
+        # Remove numbers to prevent changing timestamps/speeds from bypassing deduplication
+        text = re.sub(r'\d+', '', text)
         text = re.sub(r'[^\w\s]', '', text)
         text = re.sub(r'\s+', ' ', text).strip()
         return text
@@ -30,6 +32,11 @@ class Deduplicator:
         for event in events:
             text = event.get('text', '')
             if len(text) < 4: # Drop very short noise
+                continue
+
+            # Filter out lines that don't contain at least one real word (3+ letters)
+            # This handles gibberish like 'Ш л т ry _' or '. Ё т. : a'
+            if not re.search(r'[a-zA-Zа-яА-ЯёЁ]{3,}', text):
                 continue
 
             norm_text = self.normalize_text(text)

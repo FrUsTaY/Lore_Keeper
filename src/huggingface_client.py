@@ -9,8 +9,7 @@ class HuggingFaceClient:
         self.timeout = self.config.get("timeout", 120)
 
     def check_health(self):
-        """Checks if Hugging Face API is accessible."""
-        model = self.config.get("hf_model", "mistralai/Mistral-7B-Instruct-v0.2")
+        """Checks if Hugging Face API token is valid using whoami endpoint."""
         token = self.config.get("hf_token", "")
 
         if not token:
@@ -18,10 +17,12 @@ class HuggingFaceClient:
             return False
 
         headers = {"Authorization": f"Bearer {token}"}
-        url = f"{self.api_url}{model}"
+        url = "https://huggingface.co/api/whoami-v2"
 
         try:
-            # A simple GET request to the model's info endpoint to check if it's accessible
+            # Check token validity via whoami endpoint instead of model endpoint,
+            # because the model might be loading, gated (requiring license), or unavailable,
+            # which returns 401/403/503 even for valid tokens.
             response = requests.get(url, headers=headers, timeout=10)
             return response.status_code == 200
         except requests.exceptions.RequestException:
@@ -35,7 +36,7 @@ class HuggingFaceClient:
 
     def generate(self, messages, retries=3):
         """Sends a request to generate completion."""
-        model = self.config.get("hf_model", "mistralai/Mistral-7B-Instruct-v0.2")
+        model = self.config.get("hf_model", "HuggingFaceH4/zephyr-7b-beta")
         token = self.config.get("hf_token", "")
 
         if not token:
@@ -90,6 +91,11 @@ class HuggingFaceClient:
                             error_msg = error_data['error']
                     except:
                         pass
+                elif isinstance(e, requests.exceptions.ConnectionError):
+                    error_msg = "Ошибка сети (ConnectionError). Не удалось подключиться к серверу Hugging Face. Если вы используете VPN, проверьте его настройки, либо сервер недоступен."
+                elif isinstance(e, requests.exceptions.Timeout):
+                    error_msg = "Превышено время ожидания ответа от сервера Hugging Face (Timeout)."
+
                 if attempt == retries - 1:
                     raise Exception(f"Hugging Face Error: {error_msg}")
                 print(f"Попытка {attempt+1} не удалась: {error_msg}. Повтор через {delay} сек...")

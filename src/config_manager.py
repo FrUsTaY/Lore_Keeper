@@ -28,7 +28,7 @@ class ConfigManager:
                 "screenshots_path": get_path("outputs/screenshots"),
                 "llm_provider": "LM Studio",
                 "hf_token": "",
-                "hf_model": "mistralai/Mistral-7B-Instruct-v0.2"
+                "hf_model": "HuggingFaceH4/zephyr-7b-beta"
             }
 
     def save_config(self, new_config):
