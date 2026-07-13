@@ -27,8 +27,8 @@ class ConfigManager:
                 "save_screenshots": True,
                 "screenshots_path": get_path("outputs/screenshots"),
                 "llm_provider": "LM Studio",
-                "hf_token": "",
-                "hf_model": "HuggingFaceH4/zephyr-7b-beta"
+                "groq_token": "",
+                "groq_model": "llama-3.1-8b-instant"
             }
 
     def save_config(self, new_config):
