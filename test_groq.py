@@ -4,7 +4,7 @@ import json
 
 # Вставьте сюда ваш реальный API ключ Groq (начинается с gsk_...)
 API_KEY = "ВАШ_КЛЮЧ"
-MODEL = "llama3-8b-8192"
+MODEL = "llama-3.1-8b-instant"
 
 def test_groq():
     if API_KEY == "ВАШ_КЛЮЧ":
