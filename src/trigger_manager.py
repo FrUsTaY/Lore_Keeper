@@ -23,7 +23,7 @@ class TriggerManager:
 
         # Init Groq
         from src.groq_client import GroqClient
-        self.groq_client = GroqClient(self.cm.get_all())
+        self.groq_client = GroqClient(self.cm.config)
 
         self.logger = EventLogger(session_id=session_id)
 
