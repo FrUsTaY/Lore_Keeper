@@ -24,7 +24,7 @@ class SettingsDialog(QDialog):
         layout = QFormLayout(self)
 
         self.provider_combo = QComboBox()
-        self.provider_combo.addItems(["LM Studio", "Hugging Face"])
+        self.provider_combo.addItems(["LM Studio", "Groq"])
         self.provider_combo.setCurrentText(self.config_manager.get("llm_provider", "LM Studio"))
         self.provider_combo.currentTextChanged.connect(self.on_provider_changed)
         layout.addRow("Провайдер LLM:", self.provider_combo)
@@ -33,14 +33,23 @@ class SettingsDialog(QDialog):
         self.url_label = QLabel("LM Studio API URL:")
         layout.addRow(self.url_label, self.url_input)
 
-        self.hf_token_input = QLineEdit(self.config_manager.get("hf_token", ""))
-        self.hf_token_input.setEchoMode(QLineEdit.Password)
-        self.hf_token_label = QLabel("Hugging Face Token:")
-        layout.addRow(self.hf_token_label, self.hf_token_input)
+        self.groq_token_input = QLineEdit(self.config_manager.get("groq_token", ""))
+        self.groq_token_input.setEchoMode(QLineEdit.Password)
+        self.groq_token_label = QLabel("Groq Token:")
+        layout.addRow(self.groq_token_label, self.groq_token_input)
 
-        self.hf_model_input = QLineEdit(self.config_manager.get("hf_model", "mistralai/Mistral-7B-Instruct-v0.2"))
-        self.hf_model_label = QLabel("Hugging Face Model:")
-        layout.addRow(self.hf_model_label, self.hf_model_input)
+        self.groq_model_input = QLineEdit(self.config_manager.get("groq_model", "llama-3.1-8b-instant"))
+        self.groq_model_label = QLabel("Groq Model:")
+
+        # Кнопка для проверки доступных моделей
+        self.btn_check_groq = QPushButton("Проверить доступные мне модели")
+        self.btn_check_groq.clicked.connect(self.check_groq_models)
+
+        groq_model_layout = QHBoxLayout()
+        groq_model_layout.addWidget(self.groq_model_input)
+        groq_model_layout.addWidget(self.btn_check_groq)
+
+        layout.addRow(self.groq_model_label, groq_model_layout)
 
         self.on_provider_changed(self.provider_combo.currentText())
 
@@ -63,23 +72,60 @@ class SettingsDialog(QDialog):
         save_btn.clicked.connect(self.save_settings)
         layout.addRow("", save_btn)
 
+    def check_groq_models(self):
+        import requests
+        token = self.groq_token_input.text().strip()
+        if not token:
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, введите Groq Token перед проверкой моделей.")
+            return
+
+        try:
+            url = "https://api.groq.com/openai/v1/models"
+            headers = {"Authorization": f"Bearer {token}"}
+            response = requests.get(url, headers=headers, timeout=10)
+
+            if response.status_code == 200:
+                data = response.json()
+                models = [model.get("id") for model in data.get("data", [])]
+                if models:
+                    models_text = "\n".join(models)
+                    # Используем QInputDialog с большим текстом, чтобы можно было скопировать
+                    text_edit = QTextEdit()
+                    text_edit.setReadOnly(True)
+                    text_edit.setPlainText(models_text)
+
+                    dialog = QDialog(self)
+                    dialog.setWindowTitle("Доступные модели Groq")
+                    dialog.resize(300, 400)
+                    dlg_layout = QVBoxLayout(dialog)
+                    dlg_layout.addWidget(QLabel("Вы можете скопировать название нужной модели:"))
+                    dlg_layout.addWidget(text_edit)
+                    dialog.exec()
+                else:
+                    QMessageBox.information(self, "Модели", "Список моделей пуст.")
+            else:
+                QMessageBox.warning(self, "Ошибка API", f"Код ошибки: {response.status_code}\nПроверьте правильность токена.")
+        except Exception as e:
+            QMessageBox.critical(self, "Сетевая ошибка", f"Не удалось подключиться к Groq API:\n{e}")
+
     def on_provider_changed(self, provider):
         is_lm_studio = (provider == "LM Studio")
 
         self.url_label.setVisible(is_lm_studio)
         self.url_input.setVisible(is_lm_studio)
 
-        self.hf_token_label.setVisible(not is_lm_studio)
-        self.hf_token_input.setVisible(not is_lm_studio)
-        self.hf_model_label.setVisible(not is_lm_studio)
-        self.hf_model_input.setVisible(not is_lm_studio)
+        self.groq_token_label.setVisible(not is_lm_studio)
+        self.groq_token_input.setVisible(not is_lm_studio)
+        self.groq_model_label.setVisible(not is_lm_studio)
+        self.groq_model_input.setVisible(not is_lm_studio)
+        self.btn_check_groq.setVisible(not is_lm_studio)
 
     def save_settings(self):
         config = self.config_manager.config
         config["llm_provider"] = self.provider_combo.currentText()
         config["api_url"] = self.url_input.text()
-        config["hf_token"] = self.hf_token_input.text()
-        config["hf_model"] = self.hf_model_input.text()
+        config["groq_token"] = self.groq_token_input.text()
+        config["groq_model"] = self.groq_model_input.text()
         config["genre"] = self.genre_combo.currentText()
         config["tesseract_path"] = self.tesseract_input.text()
         config["save_screenshots"] = self.save_screenshots_cb.isChecked()
@@ -377,6 +423,9 @@ class MainWindow(QMainWindow):
             return
 
         filepath = selected.data(Qt.UserRole)
+        provider = self.config_manager.get("llm_provider", "LM Studio")
+
+        self.status_bar.showMessage(f"Обращение к {provider} для генерации истории...")
 
         self.generation_worker = GenerationWorker(
             log_path=filepath,
