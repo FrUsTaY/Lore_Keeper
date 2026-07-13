@@ -11,6 +11,8 @@ class AudioCapture:
     def __init__(self, sample_rate=44100, chunk_size=1024):
         self.sample_rate = sample_rate
         self.chunk_size = chunk_size
+        self.stream = None
+        self.channels = 1
 
         if pyaudio:
             self.p = pyaudio.PyAudio()
@@ -47,8 +49,39 @@ class AudioCapture:
 
         return None
 
+    def start_stream(self):
+        """Opens the PyAudio stream once to prevent memory leaks."""
+        if not self.p:
+            return
+
+        if self.device_index is None:
+            self.device_index = self._get_loopback_device()
+            if self.device_index is None:
+                raise Exception("No WASAPI Loopback device found.")
+
+        device_info = self.p.get_device_info_by_index(self.device_index)
+        self.channels = int(device_info["maxInputChannels"])
+        self.sample_rate = int(device_info["defaultSampleRate"])
+
+        self.stream = self.p.open(format=pyaudio.paInt16,
+                             channels=self.channels,
+                             rate=self.sample_rate,
+                             input=True,
+                             input_device_index=self.device_index,
+                             frames_per_buffer=self.chunk_size)
+
+    def stop_stream(self):
+        """Closes the active stream."""
+        if self.stream:
+            try:
+                self.stream.stop_stream()
+                self.stream.close()
+            except:
+                pass
+            self.stream = None
+
     def record_chunk(self, duration=10.0, silence_threshold=0.01, is_running_callback=None):
-        """Records a chunk of audio and returns it if above silence threshold."""
+        """Reads from the open stream for `duration` seconds."""
         if not self.p:
             # Mock behavior for testing on linux
             for _ in range(int(duration)):
@@ -57,48 +90,26 @@ class AudioCapture:
                 time.sleep(1.0)
             return None # Simulate silence
 
-        if self.device_index is None:
-            # Try to re-detect
-            self.device_index = self._get_loopback_device()
-            if self.device_index is None:
-                raise Exception("No WASAPI Loopback device found.")
+        if not self.stream:
+            self.start_stream()
 
         frames = []
         try:
-            device_info = self.p.get_device_info_by_index(self.device_index)
-            # WASAPI loopback requires exact match of sample rate and channels
-            native_channels = int(device_info["maxInputChannels"])
-            native_rate = int(device_info["defaultSampleRate"])
-
-            # Store the native values so transcriber knows how to write it
-            self.sample_rate = native_rate
-            self.channels = native_channels
-
-            stream = self.p.open(format=pyaudio.paInt16,
-                                 channels=native_channels,
-                                 rate=native_rate,
-                                 input=True,
-                                 input_device_index=self.device_index,
-                                 frames_per_buffer=self.chunk_size)
-
-            total_chunks = int(native_rate / self.chunk_size * duration)
+            total_chunks = int(self.sample_rate / self.chunk_size * duration)
             for i in range(total_chunks):
                 if is_running_callback and not is_running_callback():
                     break
 
-                data = stream.read(self.chunk_size, exception_on_overflow=False)
+                data = self.stream.read(self.chunk_size, exception_on_overflow=False)
                 frames.append(np.frombuffer(data, dtype=np.int16))
-
-            stream.stop_stream()
-            stream.close()
 
             if not frames:
                 return None
 
             audio_data = np.hstack(frames)
-            # Reshape based on channels so soundfile can write it properly
-            if native_channels > 1:
-                audio_data = audio_data.reshape(-1, native_channels)
+
+            if self.channels > 1:
+                audio_data = audio_data.reshape(-1, self.channels)
 
             # Normalize to float32 [-1.0, 1.0] for processing
             audio_float = audio_data.astype(np.float32) / 32768.0
@@ -111,11 +122,13 @@ class AudioCapture:
             return audio_float
 
         except OSError as e:
-            # Device might have disconnected, reset index
+            # Device might have disconnected, reset index and stream
             print(f"Audio capture error: {e}")
+            self.stop_stream()
             self.device_index = None
             raise
 
     def terminate(self):
+        self.stop_stream()
         if self.p:
             self.p.terminate()
