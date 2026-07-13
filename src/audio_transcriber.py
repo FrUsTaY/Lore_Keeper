@@ -3,6 +3,7 @@ import queue
 import time
 import os
 from src.groq_client import GroqClient
+from src.local_transcriber import LocalWhisperTranscriber
 import soundfile as sf
 from datetime import datetime
 
@@ -14,6 +15,13 @@ class AudioTranscriber:
         self.is_running = False
         self.thread = None
         self.on_transcription = on_transcription_callback
+
+        provider = self.client.config.get("audio_provider", "Groq API")
+        if provider == "Local Whisper (CPU/GPU)":
+            model_size = self.client.config.get("local_whisper_model", "base")
+            self.local_transcriber = LocalWhisperTranscriber(model_size=model_size)
+        else:
+            self.local_transcriber = None
 
         # Ensure temp directory exists
         self.temp_dir = "outputs/temp_audio"
@@ -54,7 +62,11 @@ class AudioTranscriber:
                 filename, timestamp = item
 
                 # Transcribe
-                text = self.client.transcribe_audio(filename)
+                provider = self.client.config.get("audio_provider", "Groq API")
+                if provider == "Local Whisper (CPU/GPU)" and self.local_transcriber:
+                    text = self.local_transcriber.transcribe(filename)
+                else:
+                    text = self.client.transcribe_audio(filename)
 
                 # Remove temp file
                 try:

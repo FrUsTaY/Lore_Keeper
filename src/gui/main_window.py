@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import (
+    QGroupBox,
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTabWidget, QTextEdit, QListWidget, QLabel, QStatusBar, QMessageBox,
     QSystemTrayIcon, QMenu, QDialog, QFormLayout, QLineEdit, QComboBox, QSlider, QCheckBox,
@@ -130,6 +131,10 @@ class SettingsDialog(QDialog):
         config["tesseract_path"] = self.tesseract_input.text()
         config["save_screenshots"] = self.save_screenshots_cb.isChecked()
         config["screenshots_path"] = self.screenshots_path_input.text()
+        config["audio_provider"] = self.audio_provider_combo.currentText()
+        config["audio_api_url"] = self.audio_url_input.text()
+        config["local_whisper_model"] = self.local_model_combo.currentText()
+
         self.config_manager.save_config(config)
         self.accept()
 

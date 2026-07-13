@@ -23,12 +23,14 @@ class ConfigManager:
                 "max_tokens": 1500,
                 "timeout": 120,
                 "genre": "fantasy",
-                "tesseract_path": r"C:\Program Files\Tesseract-OCR\tesseract.exe",
                 "save_screenshots": True,
                 "screenshots_path": get_path("outputs/screenshots"),
                 "llm_provider": "LM Studio",
                 "groq_token": "",
-                "groq_model": "llama-3.1-8b-instant"
+                "groq_model": "llama-3.1-8b-instant",
+                "audio_provider": "Groq API",
+                "audio_api_url": "https://api.groq.com/openai/v1/audio/transcriptions",
+                "local_whisper_model": "base"
             }
 
     def save_config(self, new_config):
