@@ -456,6 +456,7 @@ class MainWindow(QMainWindow):
     def quit_app(self):
         if self.capture_worker and self.capture_worker.is_running:
             self.capture_worker.stop()
+            self.capture_worker.wait() # Now we must wait here to prevent QThread destroyed while running
         if self.generation_worker and self.generation_worker.isRunning():
             self.generation_worker.quit()
             self.generation_worker.wait()
