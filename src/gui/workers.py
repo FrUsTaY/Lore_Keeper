@@ -40,8 +40,6 @@ class CaptureWorker(QThread):
     def stop(self):
         self.is_running = False
         self.trigger_manager.is_running = False
-        # Do not call trigger_manager.stop() here as it joins threads and terminates PyAudio,
-        # which can block the main GUI thread. The run() loop will exit and handle cleanup.
 
 
 

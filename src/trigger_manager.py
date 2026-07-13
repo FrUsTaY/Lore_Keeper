@@ -75,6 +75,10 @@ class TriggerManager:
                     # Send to queue
                     self.transcriber.add_audio(audio_data, self.audio_capture.sample_rate, timestamp)
 
+                # Make sure to exit if stopped during chunk
+                if not self.is_running:
+                    break
+
                 consecutive_errors = 0
 
             except Exception as e:

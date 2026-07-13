@@ -367,9 +367,12 @@ class MainWindow(QMainWindow):
 
         if self.capture_worker:
             self.capture_worker.stop()
+            # Don't wait synchronously, let the worker's status_changed signal handle UI updates
+            # or we can use QTimer to reload sessions slightly later to let flush complete.
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(500, self.load_sessions)
 
         self.text_live_log.append("--- Запись остановлена ---")
-        self.load_sessions()
 
     @Slot(str, str)
     def on_new_event(self, timestamp, text):
