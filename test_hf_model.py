@@ -4,7 +4,7 @@ import json
 import sys
 
 def test_huggingface_model(token, model, message):
-    api_url = f"https://api-inference.huggingface.co/models/{model}"
+    api_url = f"https://router.huggingface.co/hf-inference/models/{model}"
 
     headers = {
         "Authorization": f"Bearer {token}",

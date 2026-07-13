@@ -5,7 +5,7 @@ import time
 class HuggingFaceClient:
     def __init__(self, config):
         self.config = config
-        self.api_url = "https://api-inference.huggingface.co/models/"
+        self.api_url = "https://router.huggingface.co/hf-inference/models/"
         self.timeout = self.config.get("timeout", 120)
 
     def check_health(self):
