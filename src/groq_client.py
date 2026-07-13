@@ -94,3 +94,44 @@ class GroqClient:
                 print(f"Попытка {attempt+1} не удалась: {error_msg}. Повтор через {delay} сек...")
                 time.sleep(delay)
                 delay *= 2
+
+    def transcribe_audio(self, file_path, retries=3):
+        """Sends an audio file to Groq Whisper API for transcription."""
+        token = self.config.get("groq_token", "")
+        if not token:
+            print("Groq API token is missing.")
+            return ""
+
+        url = "https://api.groq.com/openai/v1/audio/transcriptions"
+        headers = {"Authorization": f"Bearer {token}"}
+
+        delay = 2
+        for attempt in range(retries):
+            try:
+                with open(file_path, "rb") as f:
+                    files = {"file": (file_path, f, "audio/wav")}
+                    # We can use whisper-large-v3
+                    data = {"model": "whisper-large-v3"}
+
+                    response = requests.post(url, headers=headers, files=files, data=data, timeout=self.timeout)
+                    response.raise_for_status()
+
+                    result = response.json()
+                    return result.get("text", "").strip()
+            except requests.exceptions.RequestException as e:
+                error_msg = str(e)
+                if hasattr(e, 'response') and e.response is not None:
+                    try:
+                        error_data = e.response.json()
+                        if 'error' in error_data and 'message' in error_data['error']:
+                            error_msg = error_data['error']['message']
+                    except:
+                        pass
+                if attempt == retries - 1:
+                    print(f"Groq Audio Error: {error_msg}")
+                    return ""
+                time.sleep(delay)
+                delay *= 2
+            except Exception as e:
+                print(f"Audio processing error: {e}")
+                return ""

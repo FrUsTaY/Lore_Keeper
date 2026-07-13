@@ -342,14 +342,23 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Ошибка", f"Не удалось удалить историю:\n{e}")
 
     def start_recording(self):
-        tesseract_path = self.config_manager.get("tesseract_path", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
-        if not os.path.exists(tesseract_path):
-            QMessageBox.critical(
-                self,
-                "Ошибка",
-                "Tesseract OCR не найден по указанному пути. "
-                "Пожалуйста, установите его и укажите правильный путь в настройках."
-            )
+        self.btn_start.setEnabled(False)
+        self.btn_stop.setEnabled(True)
+        self.text_live_log.clear()
+
+        session_id = self.session_manager.start_new_session()
+        self.text_live_log.append(f"--- Начало сессии: {session_id} ---")
+        self.tabs.setCurrentWidget(self.tab_live)
+
+        try:
+            self.capture_worker = CaptureWorker(self.session_manager)
+            self.capture_worker.new_event.connect(self.on_new_event)
+            self.capture_worker.status_changed.connect(self.status_bar.showMessage)
+            self.capture_worker.start()
+        except Exception as e:
+            self.btn_start.setEnabled(True)
+            self.btn_stop.setEnabled(False)
+            QMessageBox.critical(self, "Ошибка", f"Не удалось запустить запись:\n{str(e)}")
             return
 
         self.btn_start.setEnabled(False)
