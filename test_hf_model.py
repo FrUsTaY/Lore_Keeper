@@ -1,4 +1,3 @@
-import argparse
 import requests
 import json
 import sys
@@ -53,11 +52,9 @@ def test_huggingface_model(token, model, message):
         sys.exit(1)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Тестовый скрипт для проверки доступности моделей Hugging Face через Inference API.")
-    parser.add_argument("-t", "--token", required=True, help="Ваш Hugging Face API токен (hf_...)")
-    parser.add_argument("-m", "--model", required=True, help="ID модели, например: HuggingFaceH4/zephyr-7b-beta")
-    parser.add_argument("-msg", "--message", required=True, help="Текст сообщения (prompt), который будет отправлен модели")
+    # Зашитые параметры для удобного тестирования
+    TOKEN = "ВАШ_ТОКЕН"  # Вставьте сюда ваш реальный Hugging Face токен (hf_...)
+    MODEL = "HuggingFaceH4/zephyr-7b-beta"
+    MESSAGE = "Привет, как дела?"
 
-    args = parser.parse_args()
-
-    test_huggingface_model(args.token, args.model, args.message)
+    test_huggingface_model(TOKEN, MODEL, MESSAGE)
