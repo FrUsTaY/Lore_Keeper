@@ -33,11 +33,16 @@ class CaptureWorker(QThread):
             self.trigger_manager.start()
         except Exception as e:
             self.status_changed.emit(f"Error: {e}")
+        finally:
+            self.trigger_manager.stop()
+            self.status_changed.emit("Idle")
 
     def stop(self):
         self.is_running = False
-        self.trigger_manager.stop()
-        self.status_changed.emit("Idle")
+        self.trigger_manager.is_running = False
+        # Do not call trigger_manager.stop() here as it joins threads and terminates PyAudio,
+        # which can block the main GUI thread. The run() loop will exit and handle cleanup.
+
 
 
 class GenerationWorker(QThread):

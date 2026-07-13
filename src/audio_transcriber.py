@@ -28,8 +28,11 @@ class AudioTranscriber:
         self.is_running = False
         if self.thread:
             # push a dummy item to wake up the queue if it's blocking
-            self.queue.put(None)
-            self.thread.join()
+            try:
+                self.queue.put(None, block=False)
+            except:
+                pass
+            self.thread.join(timeout=2.0)
 
     def add_audio(self, audio_data, sample_rate, timestamp):
         """Adds audio data to the queue to be transcribed."""

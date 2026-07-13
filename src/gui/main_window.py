@@ -386,7 +386,6 @@ class MainWindow(QMainWindow):
 
         if self.capture_worker:
             self.capture_worker.stop()
-            self.capture_worker.wait()
 
         self.text_live_log.append("--- Запись остановлена ---")
         self.load_sessions()
@@ -473,7 +472,6 @@ class MainWindow(QMainWindow):
     def quit_app(self):
         if self.capture_worker and self.capture_worker.is_running:
             self.capture_worker.stop()
-            self.capture_worker.wait()
         if self.generation_worker and self.generation_worker.isRunning():
             self.generation_worker.quit()
             self.generation_worker.wait()
