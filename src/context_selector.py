@@ -44,10 +44,13 @@ class ContextSelector:
         for e in reversed(events):
             if chars_accum > target_chars:
                 break
-            end_events.insert(0, e) # Keep chronological
+            end_events.append(e) # Keep chronological
             chars_accum += len(e.get('text', ''))
+            
+        end_events.reverse()
         return end_events
 
+        # Remove overlaps and maintain the separation for the marker
     def _combine_and_deduplicate(self, original_events, start_events, end_events):
         result = []
         seen = set()
