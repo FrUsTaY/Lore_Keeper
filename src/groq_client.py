@@ -1,6 +1,7 @@
 import requests
 import json
 import time
+import logging
 
 class GroqClient:
     def __init__(self, config):
@@ -28,7 +29,8 @@ class GroqClient:
             try:
                 response = requests.get(url, headers=headers, timeout=10)
                 return response.status_code == 200
-            except:
+            except requests.exceptions.RequestException as e:
+                logging.error(f"Groq API health check failed: {e}")
                 return False
 
     def generate(self, messages, retries=3):
