@@ -16,11 +16,10 @@ class LocalWhisperTranscriber:
         self.is_loading = True
 
         def load_task():
-            # Fix silent OpenMP crash in GUI applications
-            os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
             print(f"[Local Whisper] Starting initialization for model size '{self.model_size}'...")
 
             try:
+                # Lazy import to ensure global os.environ variables set in main.py apply correctly
                 from faster_whisper import WhisperModel
 
                 cuda_available = False
@@ -45,9 +44,6 @@ class LocalWhisperTranscriber:
                         cuda_available = False
 
                 if not cuda_available:
-                    # CRITICAL: Prevent silent crash on AMD Ryzen 3 3200U (Vega) and similar CPUs
-                    os.environ["CTRANSLATE2_CPU_ISA_TO_USE"] = "GENERIC"
-                    print("[Local Whisper] Applying fallback: CTRANSLATE2_CPU_ISA_TO_USE=GENERIC (Disabled AVX2).")
                     print(f"[Local Whisper] Attempting to load model '{self.model_size}' on CPU (float32)...")
 
                     self.model = WhisperModel(

@@ -1,3 +1,10 @@
+import os
+# CRITICAL: Prevent silent crash on AMD Ryzen 3 (Vega) and similar CPUs.
+# Must be set before ANY imports of faster_whisper or ctranslate2
+os.environ["CTRANSLATE2_CPU_ISA_TO_USE"] = "GENERIC"
+# Fix silent OpenMP crash in GUI applications
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 import sys
 from PySide6.QtWidgets import QApplication
 from src.gui.main_window import MainWindow
