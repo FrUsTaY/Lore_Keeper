@@ -1,9 +1,6 @@
 import json
 
 class PromptBuilder:
-    def __init__(self):
-        pass
-
     def load_events_from_log(self, filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -30,14 +27,14 @@ class PromptBuilder:
         return base_prompt
 
     def build_user_prompt(self, events):
-        prompt = "Ниже приведены события, произошедшие с игровым персонажем в хронологическом порядке. Напиши на их основе рассказ от первого лица.\n\nСобытия:\n"
+        prompt_parts = ["Ниже приведены события, произошедшие с игровым персонажем в хронологическом порядке. Напиши на их основе рассказ от первого лица.\n\nСобытия:\n"]
         for idx, event in enumerate(events):
             time_str = event.get("timestamp", "").split("T")[-1][:8] # Extract time HH:MM:SS
             text = event.get("text", "")
-            prompt += f"[{time_str}] {text}\n"
+            prompt_parts.append(f"[{time_str}] {text}\n")
 
-        prompt += "\nРассказ:"
-        return prompt
+        prompt_parts.append("\nРассказ:")
+        return "".join(prompt_parts)
 
     def build_messages(self, events, genre, entities_context="", max_events=100):
         # We assume `events` is already filtered by ContextSelector

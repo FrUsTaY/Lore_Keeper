@@ -2,11 +2,14 @@ import threading
 import queue
 import time
 import os
+<<<<<<< fix/insecure-temp-file-creation-15571914314218237405
 import tempfile
+=======
+import logging
+>>>>>>> main
 from src.groq_client import GroqClient
 from src.local_transcriber import LocalWhisperTranscriber
 import soundfile as sf
-from datetime import datetime
 
 class AudioTranscriber:
     def __init__(self, groq_client: GroqClient, logger, on_transcription_callback=None):
@@ -36,7 +39,7 @@ class AudioTranscriber:
             # push a dummy item to wake up the queue if it's blocking
             try:
                 self.queue.put(None, block=False)
-            except:
+            except queue.Full:
                 pass
             self.thread.join(timeout=2.0)
 
@@ -99,8 +102,8 @@ class AudioTranscriber:
                 # Remove temp file
                 try:
                     os.remove(filename)
-                except:
-                    pass
+                except OSError as e:
+                    logging.warning(f"Failed to remove temp file {filename}: {e}")
 
                 if text and text.strip():
                     # Check if it's a hallucination or meaningless

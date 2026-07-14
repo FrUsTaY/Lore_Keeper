@@ -1,6 +1,7 @@
 import os
 import ctypes
 import threading
+import logging
 
 class FasterWhisperEngine:
     def __init__(self, model_size):
@@ -113,8 +114,8 @@ class WhisperCppEngine:
             for segment in segments:
                 if hasattr(segment, 'text'):
                     text_parts.append(segment.text)
-        except Exception as e:
-            print(f"[Whisper.cpp] Error parsing transcription segments: {e}")
+        except (TypeError, AttributeError) as e:
+            logging.error(f"[Whisper.cpp] Error parsing transcription segments: {e}")
             pass
 
         return " ".join(text_parts).strip()
