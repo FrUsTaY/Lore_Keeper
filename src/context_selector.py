@@ -23,25 +23,35 @@ class ContextSelector:
         target_chars_start = int(self.max_chars * 0.2)
         target_chars_end = self.max_chars - target_chars_start
 
+        start_events = self._select_start_events(events, target_chars_start)
+        end_events = self._select_end_events(events, target_chars_end)
+
+        return self._combine_and_deduplicate(events, start_events, end_events)
+
+    def _select_start_events(self, events, target_chars):
         start_events = []
         chars_accum = 0
         for e in events:
-            if chars_accum > target_chars_start:
+            if chars_accum > target_chars:
                 break
             start_events.append(e)
             chars_accum += len(e.get('text', ''))
+        return start_events
 
+    def _select_end_events(self, events, target_chars):
         end_events = []
         chars_accum = 0
         for e in reversed(events):
-            if chars_accum > target_chars_end:
+            if chars_accum > target_chars:
                 break
             end_events.append(e) # Keep chronological
             chars_accum += len(e.get('text', ''))
-
+            
         end_events.reverse()
+        return end_events
 
         # Remove overlaps and maintain the separation for the marker
+    def _combine_and_deduplicate(self, original_events, start_events, end_events):
         result = []
         seen = set()
 
@@ -52,8 +62,11 @@ class ContextSelector:
                 seen.add(ts)
                 result.append(e)
 
-        # Add a marker if we skipped events
-        if len(result) < len(events) and end_events:
+        # Calculate the total unique events spanning both start and end selections
+        total_unique_events = len(result) + sum(1 for e in end_events if e.get('timestamp') not in seen)
+
+        # If total unique events is less than the total original events, we skipped some
+        if total_unique_events < len(original_events):
             result.append({"timestamp": "", "text": "... [Часть событий пропущена] ..."})
 
         # Add end events, deduplicating based on timestamp

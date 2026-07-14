@@ -41,6 +41,7 @@ class ConfigManager:
         os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
         with open(self.config_path, 'w', encoding='utf-8') as f:
             json.dump(self.config, f, indent=2)
+        os.chmod(self.config_path, 0o600)
 
     def get(self, key, default=None):
         val = self.config.get(key, default)

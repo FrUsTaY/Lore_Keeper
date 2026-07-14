@@ -2,10 +2,11 @@ import threading
 import queue
 import time
 import os
+import logging
+import tempfile
 from src.groq_client import GroqClient
 from src.local_transcriber import LocalWhisperTranscriber
 import soundfile as sf
-from datetime import datetime
 
 class AudioTranscriber:
     def __init__(self, groq_client: GroqClient, logger, on_transcription_callback=None):
@@ -35,15 +36,17 @@ class AudioTranscriber:
             # push a dummy item to wake up the queue if it's blocking
             try:
                 self.queue.put(None, block=False)
-            except:
-                pass
+            except queue.Full as e:
+                logging.warning(f"Queue full when trying to stop: {e}")
             self.thread.join(timeout=2.0)
 
     def add_audio(self, audio_data, sample_rate, timestamp):
         """Adds audio data to the queue to be transcribed."""
         # We save it to a temporary file first because Groq expects a file
-        filename = os.path.join(self.temp_dir, f"chunk_{int(time.time()*1000)}.wav")
         try:
+            with tempfile.NamedTemporaryFile(delete=False, dir=self.temp_dir, suffix=".wav") as temp_file:
+                filename = temp_file.name
+
             sf.write(filename, audio_data, sample_rate)
             self.queue.put((filename, timestamp))
         except Exception as e:
@@ -96,8 +99,8 @@ class AudioTranscriber:
                 # Remove temp file
                 try:
                     os.remove(filename)
-                except:
-                    pass
+                except OSError as e:
+                    logging.warning(f"Failed to remove temp file {filename}: {e}")
 
                 if text and text.strip():
                     # Check if it's a hallucination or meaningless
