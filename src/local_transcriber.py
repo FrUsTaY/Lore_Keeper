@@ -25,7 +25,19 @@ class FasterWhisperEngine:
     def transcribe(self, file_path):
         if self.model is None:
             return ""
-        segments, info = self.model.transcribe(file_path, beam_size=5)
+
+        lang_env = os.environ.get("WHISPER_LANGUAGE", "auto").strip().lower()
+        if lang_env == "auto" or lang_env == "":
+            lang = None
+        else:
+            lang = lang_env
+
+        segments, info = self.model.transcribe(
+            file_path,
+            beam_size=5,
+            task="transcribe",
+            language=lang
+        )
         return " ".join([segment.text for segment in segments]).strip()
 
 class WhisperCppEngine:
@@ -35,7 +47,7 @@ class WhisperCppEngine:
 
     def load(self):
         from huggingface_hub import hf_hub_download
-        from whisper_cpp_python import Whisper
+        from pywhispercpp.model import Model
 
         filename = f"ggml-{self.model_size}.bin"
         print(f"[Whisper.cpp] Downloading/Resolving GGML model '{filename}' from ggerganov/whisper.cpp...")
@@ -45,7 +57,21 @@ class WhisperCppEngine:
         print(f"[Whisper.cpp] Resolved model path: {model_path}")
 
         print(f"[Whisper.cpp] Attempting to load model on CPU...")
-        self.model = Whisper(model_path=model_path, n_threads=4)
+
+        lang_env = os.environ.get("WHISPER_LANGUAGE", "auto").strip().lower()
+        if lang_env == "auto" or lang_env == "":
+            lang = "auto"
+        else:
+            lang = lang_env
+
+        self.model = Model(
+            model_path,
+            n_threads=4,
+            print_realtime=False,
+            print_progress=False,
+            translate=False,
+            language=lang
+        )
         print("[Whisper.cpp] Model loaded successfully on CPU.")
 
     def transcribe(self, file_path):
@@ -56,9 +82,8 @@ class WhisperCppEngine:
         # is saved using soundfile, typically using the sample rate from the WASAPI loopback
         # (often 44.1kHz or 48kHz). However, if there are sample rate issues we might need to resample.
         # But for now we try passing the file directly, or use librosa if we have to.
-        # whisper_cpp_python actually has a helper or can transcribe from file directly.
+        # pywhispercpp actually has a helper or can transcribe from file directly.
         # However, the transcribe method expects numpy arrays or handles it internally if we pass a file?
-        # Actually, whisper_cpp_python's transcribe() requires we pass the numpy array or read it.
         # Let's read it properly using soundfile and resample to 16000.
 
         import soundfile as sf
@@ -66,7 +91,7 @@ class WhisperCppEngine:
 
         # librosa is standard for resampling, but we don't have it in requirements.
         # Let's try native soundfile / scipy if we need to resample, or rely on whisper_cpp internal tools if available.
-        # whisper_cpp_python Whisper.transcribe(audio) -> audio is 1D array of type float32 at 16kHz
+        # pywhispercpp Model.transcribe(audio) -> audio is 1D array of type float32 at 16kHz
         import scipy.signal
 
         audio_data, sr = sf.read(file_path, dtype='float32')
@@ -79,22 +104,17 @@ class WhisperCppEngine:
             num_samples = round(len(audio_data) * float(16000) / sr)
             audio_data = scipy.signal.resample(audio_data, num_samples)
 
-        # whisper_cpp_python expects a numpy array.
-        result = self.model.transcribe(audio_data)
+        # pywhispercpp expects a numpy array.
+        segments = self.model.transcribe(audio_data)
 
-        # Depending on version, it might return a generator of segments or a dictionary
-        if isinstance(result, dict) and 'text' in result:
-            return result['text'].strip()
-
-        # If it returns an iterator/generator of segments
+        # pywhispercpp returns a list of Segment objects which have a `text` attribute
         text_parts = []
         try:
-            for segment in result:
-                if isinstance(segment, dict) and 'text' in segment:
-                    text_parts.append(segment['text'])
-                elif hasattr(segment, 'text'):
+            for segment in segments:
+                if hasattr(segment, 'text'):
                     text_parts.append(segment.text)
-        except Exception:
+        except Exception as e:
+            print(f"[Whisper.cpp] Error parsing transcription segments: {e}")
             pass
 
         return " ".join(text_parts).strip()
