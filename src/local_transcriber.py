@@ -25,7 +25,19 @@ class FasterWhisperEngine:
     def transcribe(self, file_path):
         if self.model is None:
             return ""
-        segments, info = self.model.transcribe(file_path, beam_size=5)
+
+        lang_env = os.environ.get("WHISPER_LANGUAGE", "auto").strip().lower()
+        if lang_env == "auto" or lang_env == "":
+            lang = None
+        else:
+            lang = lang_env
+
+        segments, info = self.model.transcribe(
+            file_path,
+            beam_size=5,
+            task="transcribe",
+            language=lang
+        )
         return " ".join([segment.text for segment in segments]).strip()
 
 class WhisperCppEngine:
@@ -45,7 +57,21 @@ class WhisperCppEngine:
         print(f"[Whisper.cpp] Resolved model path: {model_path}")
 
         print(f"[Whisper.cpp] Attempting to load model on CPU...")
-        self.model = Model(model_path, n_threads=4, print_realtime=False, print_progress=False)
+
+        lang_env = os.environ.get("WHISPER_LANGUAGE", "auto").strip().lower()
+        if lang_env == "auto" or lang_env == "":
+            lang = "auto"
+        else:
+            lang = lang_env
+
+        self.model = Model(
+            model_path,
+            n_threads=4,
+            print_realtime=False,
+            print_progress=False,
+            translate=False,
+            language=lang
+        )
         print("[Whisper.cpp] Model loaded successfully on CPU.")
 
     def transcribe(self, file_path):
