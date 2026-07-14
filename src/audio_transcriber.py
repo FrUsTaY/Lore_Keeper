@@ -2,6 +2,7 @@ import threading
 import queue
 import time
 import os
+import logging
 from src.groq_client import GroqClient
 from src.local_transcriber import LocalWhisperTranscriber
 import soundfile as sf
@@ -35,7 +36,7 @@ class AudioTranscriber:
             # push a dummy item to wake up the queue if it's blocking
             try:
                 self.queue.put(None, block=False)
-            except:
+            except queue.Full:
                 pass
             self.thread.join(timeout=2.0)
 
@@ -96,8 +97,8 @@ class AudioTranscriber:
                 # Remove temp file
                 try:
                     os.remove(filename)
-                except:
-                    pass
+                except OSError as e:
+                    logging.warning(f"Failed to remove temp file {filename}: {e}")
 
                 if text and text.strip():
                     # Check if it's a hallucination or meaningless
