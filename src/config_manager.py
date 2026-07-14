@@ -30,7 +30,9 @@ class ConfigManager:
                 "groq_model": "llama-3.1-8b-instant",
                 "audio_provider": "Groq API",
                 "audio_api_url": "https://api.groq.com/openai/v1/audio/transcriptions",
-                "local_whisper_model": "base"
+                "local_whisper_model": "base",
+                "enable_hotkey": True,
+                "hotkey_combo": "ctrl+shift+f11"
             }
 
     def save_config(self, new_config):

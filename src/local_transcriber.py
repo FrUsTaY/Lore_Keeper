@@ -7,15 +7,24 @@ class LocalWhisperTranscriber:
 
     def _load_model(self):
         if self.model is None:
-            print(f"Loading local Whisper model ({self.model_size})...")
+            # Fix silent OpenMP crash in GUI applications
+            os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+            print(f"Loading local Whisper model ({self.model_size}) into RAM (CPU)...")
             try:
                 from faster_whisper import WhisperModel
-                # Run on GPU with FP16 if available, else CPU with INT8
-                self.model = WhisperModel(self.model_size, device="auto", compute_type="default")
+                # Force CPU and INT8 to prevent hard crashes on unsupported GPUs or weak hardware
+                self.model = WhisperModel(
+                    self.model_size,
+                    device="cpu",
+                    compute_type="int8",
+                    cpu_threads=4
+                )
                 print("Local Whisper model loaded successfully.")
             except Exception as e:
-                print(f"Error loading local Whisper model: {e}")
-                raise
+                print(f"\n[CRITICAL ERROR] Error loading local Whisper model: {e}")
+                print("This might happen due to missing CUDA libraries or out of memory errors.")
+                raise e
 
     def transcribe(self, file_path):
         if not os.path.exists(file_path):

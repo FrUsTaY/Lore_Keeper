@@ -16,12 +16,9 @@ class AudioTranscriber:
         self.thread = None
         self.on_transcription = on_transcription_callback
 
-        provider = self.client.config.get("audio_provider", "Groq API")
-        if provider == "Local Whisper (CPU/GPU)":
-            model_size = self.client.config.get("local_whisper_model", "base")
-            self.local_transcriber = LocalWhisperTranscriber(model_size=model_size)
-        else:
-            self.local_transcriber = None
+        self.local_transcriber = None
+        self.provider = self.client.config.get("audio_provider", "Groq API")
+        self.model_size = self.client.config.get("local_whisper_model", "base")
 
         # Ensure temp directory exists
         self.temp_dir = "outputs/temp_audio"
@@ -53,6 +50,17 @@ class AudioTranscriber:
             print(f"Error saving temp audio: {e}")
 
     def _process_queue(self):
+        # Initialize Local Whisper lazily in the background thread to avoid freezing GUI or silent crashes during init
+        if self.provider == "Local Whisper (CPU/GPU)":
+            try:
+                self.local_transcriber = LocalWhisperTranscriber(model_size=self.model_size)
+                # Pre-load model to catch errors early in the thread
+                self.local_transcriber._load_model()
+            except Exception as e:
+                print(f"Failed to initialize Local Whisper model: {e}")
+                self.local_transcriber = None
+                self.is_running = False
+
         while self.is_running:
             try:
                 item = self.queue.get(timeout=1.0)
@@ -62,11 +70,12 @@ class AudioTranscriber:
                 filename, timestamp = item
 
                 # Transcribe
-                provider = self.client.config.get("audio_provider", "Groq API")
-                if provider == "Local Whisper (CPU/GPU)" and self.local_transcriber:
+                if self.provider == "Local Whisper (CPU/GPU)" and self.local_transcriber:
                     text = self.local_transcriber.transcribe(filename)
-                else:
+                elif self.provider != "Local Whisper (CPU/GPU)":
                     text = self.client.transcribe_audio(filename)
+                else:
+                    text = "" # Fallback if local transcriber failed to load
 
                 # Remove temp file
                 try:

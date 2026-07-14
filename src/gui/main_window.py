@@ -5,10 +5,13 @@ from PySide6.QtWidgets import (
     QSystemTrayIcon, QMenu, QDialog, QFormLayout, QLineEdit, QComboBox, QSlider, QCheckBox,
     QApplication, QListWidgetItem
 )
-from PySide6.QtCore import Qt, Slot, QTimer
+from PySide6.QtCore import Qt, Slot, QTimer, Signal
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtWidgets import QStyle
 import os
+import threading
+import time
+import keyboard
 
 from src.gui.workers import CaptureWorker, GenerationWorker
 from src.session_manager import SessionManager
@@ -83,8 +86,39 @@ class SettingsDialog(QDialog):
         self.local_model_label = QLabel("Локальная модель:")
         audio_layout.addRow(self.local_model_label, self.local_model_combo)
 
+        self.local_model_hint = QLabel("")
+        self.local_model_hint.setStyleSheet("color: #aaaaaa; font-style: italic; font-size: 11px;")
+        self.local_model_hint.setWordWrap(True)
+
+        self.btn_open_cache = QPushButton("Открыть папку с моделями")
+        self.btn_open_cache.clicked.connect(self.open_huggingface_cache)
+
+        local_model_bottom_layout = QHBoxLayout()
+        local_model_bottom_layout.addWidget(self.local_model_hint)
+        local_model_bottom_layout.addWidget(self.btn_open_cache)
+
+        # Use an empty string for the label side to push layout to the right
+        audio_layout.addRow("", local_model_bottom_layout)
+
+        self.local_model_combo.currentTextChanged.connect(self.update_local_model_hint)
+        self.update_local_model_hint(self.local_model_combo.currentText())
+
         audio_group.setLayout(audio_layout)
         main_layout.addWidget(audio_group)
+
+        # --- Hotkey Settings ---
+        hotkey_group = QGroupBox("Глобальные Горячие Клавиши")
+        hotkey_layout = QFormLayout()
+
+        self.enable_hotkey_cb = QCheckBox()
+        self.enable_hotkey_cb.setChecked(self.config_manager.get("enable_hotkey", True))
+        hotkey_layout.addRow("Включить хоткей (Старт/Стоп):", self.enable_hotkey_cb)
+
+        self.hotkey_combo_input = QLineEdit(self.config_manager.get("hotkey_combo", "ctrl+shift+f11"))
+        hotkey_layout.addRow("Комбинация клавиш:", self.hotkey_combo_input)
+
+        hotkey_group.setLayout(hotkey_layout)
+        main_layout.addWidget(hotkey_group)
 
         # --- Screenshot Settings ---
         scr_group = QGroupBox("Скриншоты")
@@ -120,6 +154,7 @@ class SettingsDialog(QDialog):
             self.audio_url_input.setReadOnly(True)
             self.local_model_label.hide()
             self.local_model_combo.hide()
+            self.local_model_hint.hide()
         elif text == "LM Studio (Custom URL)":
             self.audio_url_label.show()
             self.audio_url_input.show()
@@ -128,11 +163,37 @@ class SettingsDialog(QDialog):
                 self.audio_url_input.setText("http://localhost:1234/v1/audio/transcriptions")
             self.local_model_label.hide()
             self.local_model_combo.hide()
+            self.local_model_hint.hide()
+            if hasattr(self, 'btn_open_cache'):
+                self.btn_open_cache.hide()
         else: # Local Whisper
             self.audio_url_label.hide()
             self.audio_url_input.hide()
             self.local_model_label.show()
             self.local_model_combo.show()
+            self.local_model_hint.show()
+            if hasattr(self, 'btn_open_cache'):
+                self.btn_open_cache.show()
+
+    def open_huggingface_cache(self):
+        try:
+            from PySide6.QtGui import QDesktopServices
+            from PySide6.QtCore import QUrl
+            import os
+            cache_path = os.path.expanduser("~/.cache/huggingface/hub")
+            os.makedirs(cache_path, exist_ok=True)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(cache_path))
+        except Exception as e:
+            QMessageBox.warning(self, "Ошибка", f"Не удалось открыть папку: {e}")
+
+    def update_local_model_hint(self, model_size):
+        hints = {
+            "tiny": "Очень быстрая, требует ~1 ГБ ОЗУ. Низкая точность (возможны частые ошибки в словах).",
+            "base": "Быстрая, требует ~1.5 ГБ ОЗУ. Приемлемая точность для английского, базовая для русского.",
+            "small": "Сбалансированная, требует ~3 ГБ ОЗУ. Рекомендуется для приемлемого распознавания русской речи.",
+            "medium": "Медленная, требует ~6 ГБ ОЗУ. Отличная точность распознавания текста, но может подтормаживать на слабом ПК."
+        }
+        self.local_model_hint.setText(hints.get(model_size, ""))
 
     def on_provider_changed(self, provider):
         is_lm_studio = (provider == "LM Studio")
@@ -158,6 +219,8 @@ class SettingsDialog(QDialog):
         config["audio_provider"] = self.audio_provider_combo.currentText()
         config["audio_api_url"] = self.audio_url_input.text()
         config["local_whisper_model"] = self.local_model_combo.currentText()
+        config["enable_hotkey"] = self.enable_hotkey_cb.isChecked()
+        config["hotkey_combo"] = self.hotkey_combo_input.text()
 
         # Remove old Tesseract path if it exists
         if "tesseract_path" in config:
@@ -221,17 +284,37 @@ class SettingsDialog(QDialog):
         config["groq_token"] = self.groq_token_input.text()
         config["groq_model"] = self.groq_model_input.text()
         config["genre"] = self.genre_combo.currentText()
-        config["tesseract_path"] = self.tesseract_input.text()
         config["save_screenshots"] = self.save_screenshots_cb.isChecked()
         config["screenshots_path"] = self.screenshots_path_input.text()
         config["audio_provider"] = self.audio_provider_combo.currentText()
         config["audio_api_url"] = self.audio_url_input.text()
         config["local_whisper_model"] = self.local_model_combo.currentText()
+        config["enable_hotkey"] = self.enable_hotkey_cb.isChecked()
+        config["hotkey_combo"] = self.hotkey_combo_input.text()
 
         self.config_manager.save_config(config)
         self.accept()
 
+def _play_start_sound():
+    try:
+        import winsound
+        winsound.Beep(1000, 150)
+    except Exception:
+        pass
+
+def _play_stop_sound():
+    try:
+        import winsound
+        winsound.Beep(800, 150)
+        time.sleep(0.05)
+        winsound.Beep(800, 150)
+    except Exception:
+        pass
+
+
 class MainWindow(QMainWindow):
+    hotkey_triggered = Signal()
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Нарративный Архивариус (Lore Keeper)")
@@ -242,9 +325,40 @@ class MainWindow(QMainWindow):
         self.capture_worker = None
         self.generation_worker = None
 
+        self.hotkey_hook = None
+        self.hotkey_triggered.connect(self.toggle_recording)
+
         self.setup_ui()
         self.setup_tray()
         self.load_sessions()
+        self.setup_hotkey()
+
+    def setup_hotkey(self):
+        if self.hotkey_hook is not None:
+            try:
+                keyboard.remove_hotkey(self.hotkey_hook)
+            except Exception:
+                pass
+            self.hotkey_hook = None
+
+        if self.config_manager.get("enable_hotkey", True):
+            combo = self.config_manager.get("hotkey_combo", "ctrl+shift+f11")
+            if combo:
+                try:
+                    self.hotkey_hook = keyboard.add_hotkey(combo, self._on_hotkey_pressed)
+                except Exception as e:
+                    print(f"Error setting up hotkey: {e}")
+
+    def _on_hotkey_pressed(self):
+        self.hotkey_triggered.emit()
+
+    def toggle_recording(self):
+        if self.btn_start.isEnabled():
+            threading.Thread(target=_play_start_sound, daemon=True).start()
+            self.start_recording()
+        elif self.btn_stop.isEnabled():
+            threading.Thread(target=_play_stop_sound, daemon=True).start()
+            self.stop_recording()
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -480,6 +594,7 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         dlg = SettingsDialog(self.config_manager, self)
         dlg.exec()
+        self.setup_hotkey()
 
     def delete_session(self):
         selected = self.list_sessions.currentItem()
@@ -552,6 +667,12 @@ class MainWindow(QMainWindow):
         )
 
     def quit_app(self):
+        if self.hotkey_hook is not None:
+            try:
+                keyboard.remove_hotkey(self.hotkey_hook)
+            except Exception:
+                pass
+
         if self.capture_worker and self.capture_worker.is_running:
             self.capture_worker.stop()
             self.capture_worker.wait() # Now we must wait here to prevent QThread destroyed while running
