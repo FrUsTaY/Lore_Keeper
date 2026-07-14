@@ -221,37 +221,6 @@ class SettingsDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Сетевая ошибка", f"Не удалось подключиться к Groq API:\n{e}")
 
-    def on_provider_changed(self, provider):
-        is_lm_studio = (provider == "LM Studio")
-
-        self.url_label.setVisible(is_lm_studio)
-        self.url_input.setVisible(is_lm_studio)
-
-        self.groq_token_label.setVisible(not is_lm_studio)
-        self.groq_token_input.setVisible(not is_lm_studio)
-        self.groq_model_label.setVisible(not is_lm_studio)
-        self.groq_model_input.setVisible(not is_lm_studio)
-        self.btn_check_groq.setVisible(not is_lm_studio)
-
-    def save_settings(self):
-        config = self.config_manager.config
-        config["llm_provider"] = self.provider_combo.currentText()
-        config["api_url"] = self.url_input.text()
-        config["groq_token"] = self.groq_token_input.text()
-        config["groq_model"] = self.groq_model_input.text()
-        config["genre"] = self.genre_combo.currentText()
-        config["tesseract_path"] = self.tesseract_input.text()
-        config["save_screenshots"] = self.save_screenshots_cb.isChecked()
-        config["screenshots_path"] = self.screenshots_path_input.text()
-        config["audio_provider"] = self.audio_provider_combo.currentText()
-        config["audio_api_url"] = self.audio_url_input.text()
-        config["local_whisper_model"] = self.local_model_combo.currentText()
-        config["enable_hotkey"] = self.enable_hotkey_cb.isChecked()
-        config["hotkey_combo"] = self.hotkey_combo_input.text()
-
-        self.config_manager.save_config(config)
-        self.accept()
-
 def _play_start_sound():
     try:
         import winsound
