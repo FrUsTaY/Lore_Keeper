@@ -36,8 +36,10 @@ class ContextSelector:
         for e in reversed(events):
             if chars_accum > target_chars_end:
                 break
-            end_events.insert(0, e) # Keep chronological
+            end_events.append(e) # Keep chronological
             chars_accum += len(e.get('text', ''))
+
+        end_events.reverse()
 
         # Remove overlaps and maintain the separation for the marker
         result = []
