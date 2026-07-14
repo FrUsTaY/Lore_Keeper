@@ -94,3 +94,60 @@ class GroqClient:
                 print(f"Попытка {attempt+1} не удалась: {error_msg}. Повтор через {delay} сек...")
                 time.sleep(delay)
                 delay *= 2
+
+    def transcribe_audio(self, file_path, retries=3):
+        """Sends an audio file to an OpenAI-compatible Whisper API for transcription."""
+        provider = self.config.get("audio_provider", "Groq API")
+
+        # If it's local whisper, this method shouldn't be called (handled in transcriber),
+        # but just in case, we do nothing here.
+        if provider == "Local Whisper (CPU/GPU)":
+            return ""
+
+        url = self.config.get("audio_api_url", "https://api.groq.com/openai/v1/audio/transcriptions")
+        headers = {}
+
+        # Only require token if hitting Groq or an external API that needs it
+        if "groq.com" in url:
+            token = self.config.get("groq_token", "")
+            if not token:
+                print("Groq API token is missing for audio transcription.")
+                return ""
+            headers["Authorization"] = f"Bearer {token}"
+            model_name = "whisper-large-v3"
+        else:
+            # Local LM studio or other
+            token = self.config.get("groq_token", "")
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+            model_name = "whisper" # Usually LM studio just ignores this or uses loaded model
+
+        delay = 2
+        for attempt in range(retries):
+            try:
+                with open(file_path, "rb") as f:
+                    files = {"file": (file_path, f, "audio/wav")}
+                    data = {"model": model_name}
+
+                    response = requests.post(url, headers=headers, files=files, data=data, timeout=self.timeout)
+                    response.raise_for_status()
+
+                    result = response.json()
+                    return result.get("text", "").strip()
+            except requests.exceptions.RequestException as e:
+                error_msg = str(e)
+                if hasattr(e, 'response') and e.response is not None:
+                    try:
+                        error_data = e.response.json()
+                        if 'error' in error_data and 'message' in error_data['error']:
+                            error_msg = error_data['error']['message']
+                    except:
+                        pass
+                if attempt == retries - 1:
+                    print(f"Audio API Error: {error_msg}")
+                    return ""
+                time.sleep(delay)
+                delay *= 2
+            except Exception as e:
+                print(f"Audio processing error: {e}")
+                return ""

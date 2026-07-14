@@ -2,9 +2,6 @@ import os
 
 def test_imports():
     from src.screen_capture import ScreenCapture
-    from src.roi_detector import ROIDetector
-    from src.ring_buffer import RingBuffer
-    from src.ocr_engine import OCREngine
     from src.event_logger import EventLogger
     from src.trigger_manager import TriggerManager
 

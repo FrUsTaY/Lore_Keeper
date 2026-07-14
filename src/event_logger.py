@@ -36,8 +36,7 @@ class EventLogger:
         self.events.append(event)
 
         # Flush every 10 events
-        if len(self.events) % 10 == 0:
-            self.flush()
+        self.flush()
 
     def flush(self):
         data = {

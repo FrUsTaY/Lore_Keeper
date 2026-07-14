@@ -13,6 +13,17 @@ class SessionManager:
     def start_new_session(self):
         self.current_session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.current_events = []
+
+        # Pre-create an empty log file so it's visible immediately
+        log_file = os.path.join(self.logs_dir, f"raw_events_{self.current_session_id}.json")
+        data = {
+            "schema_version": 1,
+            "session_id": self.current_session_id,
+            "events": []
+        }
+        with open(log_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
         return self.current_session_id
 
     def add_event(self, timestamp, text):

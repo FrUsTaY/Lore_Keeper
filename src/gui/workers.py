@@ -33,11 +33,19 @@ class CaptureWorker(QThread):
             self.trigger_manager.start()
         except Exception as e:
             self.status_changed.emit(f"Error: {e}")
+        finally:
+            self.trigger_manager.stop()
+            self.status_changed.emit("Idle")
+            print("CaptureWorker loop completely finished.")
 
     def stop(self):
         self.is_running = False
-        self.trigger_manager.stop()
-        self.status_changed.emit("Idle")
+        self.trigger_manager.is_running = False
+
+        # We need to explicitly signal transcriber to stop so queue unblocks
+        if hasattr(self.trigger_manager, 'transcriber'):
+            self.trigger_manager.transcriber.stop()
+
 
 
 class GenerationWorker(QThread):
