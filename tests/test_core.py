@@ -17,6 +17,32 @@ def test_imports():
     from src.session_manager import SessionManager
     assert True
 
+def test_deduplicator_normalize_text():
+    from src.deduplicator import Deduplicator
+    dedup = Deduplicator()
+
+    # Lowercase conversion
+    assert dedup.normalize_text("HELLO WORLD") == "hello world"
+    # Cyrillic lowercase conversion, including Ё
+    assert dedup.normalize_text("ПРИВЕТ МИР ЁЖИК") == "привет мир ёжик"
+
+    # Number removal
+    assert dedup.normalize_text("text 123 with 456 numbers") == "text with numbers"
+    # Cyrillic with numbers
+    assert dedup.normalize_text("текст 123 с 456 цифрами") == "текст с цифрами"
+
+    # Punctuation removal
+    assert dedup.normalize_text("hello, world! how are you?") == "hello world how are you"
+    # Cyrillic punctuation removal
+    assert dedup.normalize_text("привет, мир! как дела?") == "привет мир как дела"
+
+    # Extra space removal and strip
+    assert dedup.normalize_text("  too   many    spaces  ") == "too many spaces"
+
+    # Combined complex case (Cyrillic, uppercase, numbers, punctuation, spaces)
+    complex_text = "  ЁЖИК  в ТУМАНЕ!!!  1975 года... \n\t Выпуска 12.  "
+    assert dedup.normalize_text(complex_text) == "ёжик в тумане года выпуска"
+
 def test_deduplicator():
     from src.deduplicator import Deduplicator
     dedup = Deduplicator(threshold=85.0)
