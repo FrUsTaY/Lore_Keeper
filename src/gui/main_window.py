@@ -86,6 +86,15 @@ class SettingsDialog(QDialog):
         self.local_model_label = QLabel("Локальная модель:")
         audio_layout.addRow(self.local_model_label, self.local_model_combo)
 
+        self.local_model_hint = QLabel("")
+        self.local_model_hint.setStyleSheet("color: #aaaaaa; font-style: italic; font-size: 11px;")
+        self.local_model_hint.setWordWrap(True)
+        # Empty row trick to put hint below combobox
+        audio_layout.addRow("", self.local_model_hint)
+
+        self.local_model_combo.currentTextChanged.connect(self.update_local_model_hint)
+        self.update_local_model_hint(self.local_model_combo.currentText())
+
         audio_group.setLayout(audio_layout)
         main_layout.addWidget(audio_group)
 
@@ -137,6 +146,7 @@ class SettingsDialog(QDialog):
             self.audio_url_input.setReadOnly(True)
             self.local_model_label.hide()
             self.local_model_combo.hide()
+            self.local_model_hint.hide()
         elif text == "LM Studio (Custom URL)":
             self.audio_url_label.show()
             self.audio_url_input.show()
@@ -145,11 +155,22 @@ class SettingsDialog(QDialog):
                 self.audio_url_input.setText("http://localhost:1234/v1/audio/transcriptions")
             self.local_model_label.hide()
             self.local_model_combo.hide()
+            self.local_model_hint.hide()
         else: # Local Whisper
             self.audio_url_label.hide()
             self.audio_url_input.hide()
             self.local_model_label.show()
             self.local_model_combo.show()
+            self.local_model_hint.show()
+
+    def update_local_model_hint(self, model_size):
+        hints = {
+            "tiny": "Очень быстрая, требует ~1 ГБ ОЗУ. Низкая точность (возможны частые ошибки в словах).",
+            "base": "Быстрая, требует ~1.5 ГБ ОЗУ. Приемлемая точность для английского, базовая для русского.",
+            "small": "Сбалансированная, требует ~3 ГБ ОЗУ. Рекомендуется для приемлемого распознавания русской речи.",
+            "medium": "Медленная, требует ~6 ГБ ОЗУ. Отличная точность распознавания текста, но может подтормаживать на слабом ПК."
+        }
+        self.local_model_hint.setText(hints.get(model_size, ""))
 
     def on_provider_changed(self, provider):
         is_lm_studio = (provider == "LM Studio")
