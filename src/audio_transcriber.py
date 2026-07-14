@@ -2,11 +2,8 @@ import threading
 import queue
 import time
 import os
-<<<<<<< fix/insecure-temp-file-creation-15571914314218237405
-import tempfile
-=======
 import logging
->>>>>>> main
+import tempfile
 from src.groq_client import GroqClient
 from src.local_transcriber import LocalWhisperTranscriber
 import soundfile as sf
@@ -39,8 +36,8 @@ class AudioTranscriber:
             # push a dummy item to wake up the queue if it's blocking
             try:
                 self.queue.put(None, block=False)
-            except queue.Full:
-                pass
+            except queue.Full as e:
+                logging.warning(f"Queue full when trying to stop: {e}")
             self.thread.join(timeout=2.0)
 
     def add_audio(self, audio_data, sample_rate, timestamp):
