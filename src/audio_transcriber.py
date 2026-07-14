@@ -54,14 +54,28 @@ class AudioTranscriber:
         if self.provider == "Local Whisper (CPU/GPU)":
             try:
                 self.local_transcriber = LocalWhisperTranscriber(model_size=self.model_size)
-                # Pre-load model to catch errors early in the thread
-                self.local_transcriber._load_model()
+                # Pre-load model asynchronously
+                self.local_transcriber.load_model_async()
             except Exception as e:
                 print(f"Failed to initialize Local Whisper model: {e}")
                 self.local_transcriber = None
                 self.is_running = False
 
         while self.is_running:
+            # Check if using local provider and it's still loading
+            if self.provider == "Local Whisper (CPU/GPU)" and self.local_transcriber:
+                if not self.local_transcriber.is_ready:
+                    if self.local_transcriber.is_loading:
+                        # If model is actively loading, sleep and continue so chunks queue up without blocking
+                        time.sleep(1.0)
+                        continue
+                    else:
+                        # Model failed to load completely. Stop processing local transcription to avoid infinite loop.
+                        print("Local Whisper model failed to initialize. Disabling local transcription.")
+                        self.local_transcriber = None
+                        self.is_running = False
+                        break
+
             try:
                 item = self.queue.get(timeout=1.0)
                 if item is None:
