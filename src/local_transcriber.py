@@ -14,8 +14,9 @@ class LocalWhisperTranscriber:
                 self.model = WhisperModel(self.model_size, device="auto", compute_type="default")
                 print("Local Whisper model loaded successfully.")
             except Exception as e:
-                print(f"Error loading local Whisper model: {e}")
-                raise
+                print(f"\n[CRITICAL ERROR] Error loading local Whisper model: {e}")
+                print("This might happen due to missing CUDA libraries or out of memory errors.")
+                raise e
 
     def transcribe(self, file_path):
         if not os.path.exists(file_path):
