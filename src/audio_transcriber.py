@@ -69,6 +69,8 @@ class AudioTranscriber:
 
                 filename, timestamp = item
 
+                start_time = time.time()
+
                 # Transcribe
                 if self.provider == "Local Whisper (CPU/GPU)" and self.local_transcriber:
                     text = self.local_transcriber.transcribe(filename)
@@ -95,7 +97,9 @@ class AudioTranscriber:
                             self.on_transcription(clean_text)
 
                 # Rate limit: Wait 2.5 seconds between requests to avoid 429 Too Many Requests
-                time.sleep(2.5)
+                elapsed_time = time.time() - start_time
+                sleep_time = 2.5 - elapsed_time
+                time.sleep(max(0.0, sleep_time))
                 self.queue.task_done()
 
             except queue.Empty:
