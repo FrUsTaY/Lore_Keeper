@@ -9,6 +9,7 @@ class SessionManager:
         os.makedirs(self.logs_dir, exist_ok=True)
         self.current_session_id = None
         self.current_events = []
+        self._sessions_cache = {}
 
     def start_new_session(self):
         self.current_session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -36,10 +37,20 @@ class SessionManager:
     def get_all_sessions(self):
         """Returns list of all session log files and their info."""
         sessions = []
+        current_files = set()
+
         for f in os.listdir(self.logs_dir):
             if f.startswith("raw_events_") and f.endswith(".json"):
                 filepath = os.path.join(self.logs_dir, f)
+                current_files.add(filepath)
+
                 try:
+                    mtime = os.path.getmtime(filepath)
+
+                    if filepath in self._sessions_cache and self._sessions_cache[filepath]['mtime'] == mtime:
+                        sessions.append(self._sessions_cache[filepath]['data'])
+                        continue
+
                     with open(filepath, 'r', encoding='utf-8') as file:
                         data = json.load(file)
                         events = data.get('events', [])
@@ -47,13 +58,26 @@ class SessionManager:
                     # Extract date from filename: raw_events_YYYYMMDD_HHMMSS.json
                     date_str = f.replace("raw_events_", "").replace(".json", "")
 
-                    sessions.append({
+                    session_data = {
                         "id": date_str,
                         "file": filepath,
                         "event_count": len(events)
-                    })
+                    }
+
+                    self._sessions_cache[filepath] = {
+                        'mtime': mtime,
+                        'data': session_data
+                    }
+
+                    sessions.append(session_data)
                 except:
                     pass
+
+        # Remove cached entries for files that no longer exist
+        keys_to_remove = [k for k in self._sessions_cache.keys() if k not in current_files]
+        for k in keys_to_remove:
+            del self._sessions_cache[k]
+
         # Sort newest first
         sessions.sort(key=lambda x: x["id"], reverse=True)
         return sessions
