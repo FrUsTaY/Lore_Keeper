@@ -5,7 +5,6 @@ import os
 from src.groq_client import GroqClient
 from src.local_transcriber import LocalWhisperTranscriber
 import soundfile as sf
-from datetime import datetime
 
 class AudioTranscriber:
     def __init__(self, groq_client: GroqClient, logger, on_transcription_callback=None):
