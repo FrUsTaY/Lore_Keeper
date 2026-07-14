@@ -89,8 +89,16 @@ class SettingsDialog(QDialog):
         self.local_model_hint = QLabel("")
         self.local_model_hint.setStyleSheet("color: #aaaaaa; font-style: italic; font-size: 11px;")
         self.local_model_hint.setWordWrap(True)
-        # Empty row trick to put hint below combobox
-        audio_layout.addRow("", self.local_model_hint)
+
+        self.btn_open_cache = QPushButton("Открыть папку с моделями")
+        self.btn_open_cache.clicked.connect(self.open_huggingface_cache)
+
+        local_model_bottom_layout = QHBoxLayout()
+        local_model_bottom_layout.addWidget(self.local_model_hint)
+        local_model_bottom_layout.addWidget(self.btn_open_cache)
+
+        # Use an empty string for the label side to push layout to the right
+        audio_layout.addRow("", local_model_bottom_layout)
 
         self.local_model_combo.currentTextChanged.connect(self.update_local_model_hint)
         self.update_local_model_hint(self.local_model_combo.currentText())
@@ -156,12 +164,27 @@ class SettingsDialog(QDialog):
             self.local_model_label.hide()
             self.local_model_combo.hide()
             self.local_model_hint.hide()
+            if hasattr(self, 'btn_open_cache'):
+                self.btn_open_cache.hide()
         else: # Local Whisper
             self.audio_url_label.hide()
             self.audio_url_input.hide()
             self.local_model_label.show()
             self.local_model_combo.show()
             self.local_model_hint.show()
+            if hasattr(self, 'btn_open_cache'):
+                self.btn_open_cache.show()
+
+    def open_huggingface_cache(self):
+        try:
+            from PySide6.QtGui import QDesktopServices
+            from PySide6.QtCore import QUrl
+            import os
+            cache_path = os.path.expanduser("~/.cache/huggingface/hub")
+            os.makedirs(cache_path, exist_ok=True)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(cache_path))
+        except Exception as e:
+            QMessageBox.warning(self, "Ошибка", f"Не удалось открыть папку: {e}")
 
     def update_local_model_hint(self, model_size):
         hints = {
