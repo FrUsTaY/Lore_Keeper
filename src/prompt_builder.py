@@ -1,9 +1,6 @@
 import json
 
 class PromptBuilder:
-    def __init__(self):
-        pass
-
     def load_events_from_log(self, filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
