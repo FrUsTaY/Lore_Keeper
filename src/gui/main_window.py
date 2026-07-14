@@ -20,29 +20,32 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.config_manager = config_manager
         self.setWindowTitle("Настройки")
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(500)
 
-        layout = QFormLayout(self)
+        main_layout = QVBoxLayout(self)
+
+        # --- LLM Provider Settings (for text generation) ---
+        llm_group = QGroupBox("Генерация Истории (LLM)")
+        llm_layout = QFormLayout()
 
         self.provider_combo = QComboBox()
         self.provider_combo.addItems(["LM Studio", "Groq"])
         self.provider_combo.setCurrentText(self.config_manager.get("llm_provider", "LM Studio"))
         self.provider_combo.currentTextChanged.connect(self.on_provider_changed)
-        layout.addRow("Провайдер LLM:", self.provider_combo)
+        llm_layout.addRow("Провайдер LLM:", self.provider_combo)
 
         self.url_input = QLineEdit(self.config_manager.get("api_url"))
         self.url_label = QLabel("LM Studio API URL:")
-        layout.addRow(self.url_label, self.url_input)
+        llm_layout.addRow(self.url_label, self.url_input)
 
         self.groq_token_input = QLineEdit(self.config_manager.get("groq_token", ""))
         self.groq_token_input.setEchoMode(QLineEdit.Password)
         self.groq_token_label = QLabel("Groq Token:")
-        layout.addRow(self.groq_token_label, self.groq_token_input)
+        llm_layout.addRow(self.groq_token_label, self.groq_token_input)
 
         self.groq_model_input = QLineEdit(self.config_manager.get("groq_model", "llama-3.1-8b-instant"))
         self.groq_model_label = QLabel("Groq Model:")
 
-        # Кнопка для проверки доступных моделей
         self.btn_check_groq = QPushButton("Проверить доступные мне модели")
         self.btn_check_groq.clicked.connect(self.check_groq_models)
 
@@ -50,28 +53,118 @@ class SettingsDialog(QDialog):
         groq_model_layout.addWidget(self.groq_model_input)
         groq_model_layout.addWidget(self.btn_check_groq)
 
-        layout.addRow(self.groq_model_label, groq_model_layout)
-
-        self.on_provider_changed(self.provider_combo.currentText())
+        llm_layout.addRow(self.groq_model_label, groq_model_layout)
 
         self.genre_combo = QComboBox()
         self.genre_combo.addItems(["fantasy", "cyberpunk", "realism", "horror"])
         self.genre_combo.setCurrentText(self.config_manager.get("genre", "fantasy"))
-        layout.addRow("Жанр по умолчанию:", self.genre_combo)
+        llm_layout.addRow("Жанр по умолчанию:", self.genre_combo)
 
-        self.tesseract_input = QLineEdit(self.config_manager.get("tesseract_path", r"C:\Program Files\Tesseract-OCR\tesseract.exe"))
-        layout.addRow("Путь к Tesseract:", self.tesseract_input)
+        llm_group.setLayout(llm_layout)
+        main_layout.addWidget(llm_group)
+
+        # --- Audio Recognition Settings ---
+        audio_group = QGroupBox("Распознавание Аудио")
+        audio_layout = QFormLayout()
+
+        self.audio_provider_combo = QComboBox()
+        self.audio_provider_combo.addItems(["Groq API", "LM Studio (Custom URL)", "Local Whisper (CPU/GPU)"])
+        self.audio_provider_combo.setCurrentText(self.config_manager.get("audio_provider", "Groq API"))
+        self.audio_provider_combo.currentTextChanged.connect(self.on_audio_provider_changed)
+        audio_layout.addRow("Источник (Provider):", self.audio_provider_combo)
+
+        self.audio_url_input = QLineEdit(self.config_manager.get("audio_api_url", "https://api.groq.com/openai/v1/audio/transcriptions"))
+        self.audio_url_label = QLabel("Audio API URL:")
+        audio_layout.addRow(self.audio_url_label, self.audio_url_input)
+
+        self.local_model_combo = QComboBox()
+        self.local_model_combo.addItems(["tiny", "base", "small", "medium"])
+        self.local_model_combo.setCurrentText(self.config_manager.get("local_whisper_model", "base"))
+        self.local_model_label = QLabel("Локальная модель:")
+        audio_layout.addRow(self.local_model_label, self.local_model_combo)
+
+        audio_group.setLayout(audio_layout)
+        main_layout.addWidget(audio_group)
+
+        # --- Screenshot Settings ---
+        scr_group = QGroupBox("Скриншоты")
+        scr_layout = QFormLayout()
 
         self.save_screenshots_cb = QCheckBox()
         self.save_screenshots_cb.setChecked(self.config_manager.get("save_screenshots", True))
-        layout.addRow("Сохранять скриншоты:", self.save_screenshots_cb)
+        scr_layout.addRow("Сохранять скриншоты:", self.save_screenshots_cb)
 
         self.screenshots_path_input = QLineEdit(self.config_manager.get("screenshots_path", "outputs/screenshots"))
-        layout.addRow("Путь к скриншотам:", self.screenshots_path_input)
+        scr_layout.addRow("Путь к скриншотам:", self.screenshots_path_input)
 
-        save_btn = QPushButton("Сохранить")
-        save_btn.clicked.connect(self.save_settings)
-        layout.addRow("", save_btn)
+        scr_group.setLayout(scr_layout)
+        main_layout.addWidget(scr_group)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_save = QPushButton("Сохранить")
+        btn_save.clicked.connect(self.save_settings)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_save)
+        main_layout.addLayout(btn_layout)
+
+        # Initial states
+        self.on_provider_changed(self.provider_combo.currentText())
+        self.on_audio_provider_changed(self.audio_provider_combo.currentText())
+
+    def on_audio_provider_changed(self, text):
+        if text == "Groq API":
+            self.audio_url_label.show()
+            self.audio_url_input.show()
+            self.audio_url_input.setText("https://api.groq.com/openai/v1/audio/transcriptions")
+            self.audio_url_input.setReadOnly(True)
+            self.local_model_label.hide()
+            self.local_model_combo.hide()
+        elif text == "LM Studio (Custom URL)":
+            self.audio_url_label.show()
+            self.audio_url_input.show()
+            self.audio_url_input.setReadOnly(False)
+            if "groq.com" in self.audio_url_input.text():
+                self.audio_url_input.setText("http://localhost:1234/v1/audio/transcriptions")
+            self.local_model_label.hide()
+            self.local_model_combo.hide()
+        else: # Local Whisper
+            self.audio_url_label.hide()
+            self.audio_url_input.hide()
+            self.local_model_label.show()
+            self.local_model_combo.show()
+
+    def on_provider_changed(self, provider):
+        is_lm_studio = (provider == "LM Studio")
+
+        self.url_label.setVisible(is_lm_studio)
+        self.url_input.setVisible(is_lm_studio)
+
+        self.groq_token_label.setVisible(not is_lm_studio)
+        self.groq_token_input.setVisible(not is_lm_studio)
+        self.groq_model_label.setVisible(not is_lm_studio)
+        self.groq_model_input.setVisible(not is_lm_studio)
+        self.btn_check_groq.setVisible(not is_lm_studio)
+
+    def save_settings(self):
+        config = self.config_manager.config
+        config["llm_provider"] = self.provider_combo.currentText()
+        config["api_url"] = self.url_input.text()
+        config["groq_token"] = self.groq_token_input.text()
+        config["groq_model"] = self.groq_model_input.text()
+        config["genre"] = self.genre_combo.currentText()
+        config["save_screenshots"] = self.save_screenshots_cb.isChecked()
+        config["screenshots_path"] = self.screenshots_path_input.text()
+        config["audio_provider"] = self.audio_provider_combo.currentText()
+        config["audio_api_url"] = self.audio_url_input.text()
+        config["local_whisper_model"] = self.local_model_combo.currentText()
+
+        # Remove old Tesseract path if it exists
+        if "tesseract_path" in config:
+            del config["tesseract_path"]
+
+        self.config_manager.save_config(config)
+        self.accept()
 
     def check_groq_models(self):
         import requests
