@@ -9,7 +9,7 @@ MODEL = "llama-3.1-8b-instant"
 def test_groq():
     if API_KEY == "ВАШ_КЛЮЧ":
         print("[!] ОШИБКА: Пожалуйста, откройте файл test_groq.py и замените 'ВАШ_КЛЮЧ' на ваш реальный токен Groq.")
-        sys.exit(1)
+        return
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {

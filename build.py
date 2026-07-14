@@ -17,7 +17,6 @@ def build():
         "--windowed",
         "--add-data", f"configs{os.pathsep}configs",
         "--hidden-import", "PySide6",
-        "--hidden-import", "pytesseract",
         "--hidden-import", "mss",
         "--hidden-import", "cv2",
         "--hidden-import", "PIL",
@@ -28,7 +27,9 @@ def build():
         "--hidden-import", "numpy",
         "--hidden-import", "spacy",
         "--hidden-import", "rapidfuzz",
-        "--hidden-import", "src.huggingface_client",
+        "--hidden-import", "src.groq_client",
+        "--hidden-import", "soundfile",
+        "--hidden-import", "PyAudioWPatch",
         "--name", "LoreKeeper",
         "main.py"
     ]
