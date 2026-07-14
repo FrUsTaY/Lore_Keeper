@@ -12,4 +12,4 @@ def get_path(relative_path):
 def ensure_required_directories():
     dirs = ["logs", "outputs/stories", "outputs/screenshots"]
     for d in dirs:
-        os.makedirs(get_path(d), exist_ok=True)
+        os.makedirs(get_path(d), mode=0o700, exist_ok=True)
