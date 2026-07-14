@@ -2,6 +2,8 @@ import os
 # CRITICAL: Prevent silent crash on AMD Ryzen 3 (Vega) and similar CPUs.
 # Must be set before ANY imports of faster_whisper or ctranslate2
 os.environ["CTRANSLATE2_CPU_ISA_TO_USE"] = "GENERIC"
+os.environ["OMP_NUM_THREADS"] = "1"       # Prevent OpenMP thread conflicts during init
+os.environ["MKL_DEBUG_CPU_TYPE"] = "5"    # Force correct MKL execution on AMD CPUs
 # Fix silent OpenMP crash in GUI applications
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 

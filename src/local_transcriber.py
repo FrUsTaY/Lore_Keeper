@@ -20,7 +20,14 @@ class LocalWhisperTranscriber:
 
             try:
                 # Lazy import to ensure global os.environ variables set in main.py apply correctly
-                from faster_whisper import WhisperModel
+                from faster_whisper import WhisperModel, download_model
+
+                # Resolve the absolute path of the model first.
+                # This prevents C++ backend silent crashes caused by Windows symlinks
+                # or path parsing issues within HuggingFace cache.
+                print(f"[Local Whisper] Downloading/Resolving absolute path for model '{self.model_size}'...")
+                model_path = download_model(self.model_size, local_files_only=False)
+                print(f"[Local Whisper] Resolved model path: {model_path}")
 
                 cuda_available = False
                 try:
@@ -32,9 +39,9 @@ class LocalWhisperTranscriber:
 
                 if cuda_available:
                     try:
-                        print(f"[Local Whisper] Attempting to load model '{self.model_size}' on CUDA (float16)...")
+                        print(f"[Local Whisper] Attempting to load model from path '{model_path}' on CUDA (float16)...")
                         self.model = WhisperModel(
-                            self.model_size,
+                            model_path,
                             device="cuda",
                             compute_type="float16"
                         )
@@ -44,10 +51,10 @@ class LocalWhisperTranscriber:
                         cuda_available = False
 
                 if not cuda_available:
-                    print(f"[Local Whisper] Attempting to load model '{self.model_size}' on CPU (float32)...")
+                    print(f"[Local Whisper] Attempting to load model from path '{model_path}' on CPU (float32)...")
 
                     self.model = WhisperModel(
-                        self.model_size,
+                        model_path,
                         device="cpu",
                         compute_type="float32",
                         cpu_threads=4
