@@ -5,10 +5,13 @@ from PySide6.QtWidgets import (
     QSystemTrayIcon, QMenu, QDialog, QFormLayout, QLineEdit, QComboBox, QSlider, QCheckBox,
     QApplication, QListWidgetItem
 )
-from PySide6.QtCore import Qt, Slot, QTimer
+from PySide6.QtCore import Qt, Slot, QTimer, Signal
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtWidgets import QStyle
 import os
+import threading
+import time
+import keyboard
 
 from src.gui.workers import CaptureWorker, GenerationWorker
 from src.session_manager import SessionManager
@@ -86,6 +89,20 @@ class SettingsDialog(QDialog):
         audio_group.setLayout(audio_layout)
         main_layout.addWidget(audio_group)
 
+        # --- Hotkey Settings ---
+        hotkey_group = QGroupBox("Глобальные Горячие Клавиши")
+        hotkey_layout = QFormLayout()
+
+        self.enable_hotkey_cb = QCheckBox()
+        self.enable_hotkey_cb.setChecked(self.config_manager.get("enable_hotkey", True))
+        hotkey_layout.addRow("Включить хоткей (Старт/Стоп):", self.enable_hotkey_cb)
+
+        self.hotkey_combo_input = QLineEdit(self.config_manager.get("hotkey_combo", "ctrl+shift+f11"))
+        hotkey_layout.addRow("Комбинация клавиш:", self.hotkey_combo_input)
+
+        hotkey_group.setLayout(hotkey_layout)
+        main_layout.addWidget(hotkey_group)
+
         # --- Screenshot Settings ---
         scr_group = QGroupBox("Скриншоты")
         scr_layout = QFormLayout()
@@ -158,6 +175,8 @@ class SettingsDialog(QDialog):
         config["audio_provider"] = self.audio_provider_combo.currentText()
         config["audio_api_url"] = self.audio_url_input.text()
         config["local_whisper_model"] = self.local_model_combo.currentText()
+        config["enable_hotkey"] = self.enable_hotkey_cb.isChecked()
+        config["hotkey_combo"] = self.hotkey_combo_input.text()
 
         # Remove old Tesseract path if it exists
         if "tesseract_path" in config:
@@ -227,11 +246,32 @@ class SettingsDialog(QDialog):
         config["audio_provider"] = self.audio_provider_combo.currentText()
         config["audio_api_url"] = self.audio_url_input.text()
         config["local_whisper_model"] = self.local_model_combo.currentText()
+        config["enable_hotkey"] = self.enable_hotkey_cb.isChecked()
+        config["hotkey_combo"] = self.hotkey_combo_input.text()
 
         self.config_manager.save_config(config)
         self.accept()
 
+def _play_start_sound():
+    try:
+        import winsound
+        winsound.Beep(1000, 150)
+    except Exception:
+        pass
+
+def _play_stop_sound():
+    try:
+        import winsound
+        winsound.Beep(800, 150)
+        time.sleep(0.05)
+        winsound.Beep(800, 150)
+    except Exception:
+        pass
+
+
 class MainWindow(QMainWindow):
+    hotkey_triggered = Signal()
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Нарративный Архивариус (Lore Keeper)")
@@ -242,9 +282,40 @@ class MainWindow(QMainWindow):
         self.capture_worker = None
         self.generation_worker = None
 
+        self.hotkey_hook = None
+        self.hotkey_triggered.connect(self.toggle_recording)
+
         self.setup_ui()
         self.setup_tray()
         self.load_sessions()
+        self.setup_hotkey()
+
+    def setup_hotkey(self):
+        if self.hotkey_hook is not None:
+            try:
+                keyboard.remove_hotkey(self.hotkey_hook)
+            except Exception:
+                pass
+            self.hotkey_hook = None
+
+        if self.config_manager.get("enable_hotkey", True):
+            combo = self.config_manager.get("hotkey_combo", "ctrl+shift+f11")
+            if combo:
+                try:
+                    self.hotkey_hook = keyboard.add_hotkey(combo, self._on_hotkey_pressed)
+                except Exception as e:
+                    print(f"Error setting up hotkey: {e}")
+
+    def _on_hotkey_pressed(self):
+        self.hotkey_triggered.emit()
+
+    def toggle_recording(self):
+        if self.btn_start.isEnabled():
+            threading.Thread(target=_play_start_sound, daemon=True).start()
+            self.start_recording()
+        elif self.btn_stop.isEnabled():
+            threading.Thread(target=_play_stop_sound, daemon=True).start()
+            self.stop_recording()
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -480,6 +551,7 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         dlg = SettingsDialog(self.config_manager, self)
         dlg.exec()
+        self.setup_hotkey()
 
     def delete_session(self):
         selected = self.list_sessions.currentItem()
@@ -552,6 +624,12 @@ class MainWindow(QMainWindow):
         )
 
     def quit_app(self):
+        if self.hotkey_hook is not None:
+            try:
+                keyboard.remove_hotkey(self.hotkey_hook)
+            except Exception:
+                pass
+
         if self.capture_worker and self.capture_worker.is_running:
             self.capture_worker.stop()
             self.capture_worker.wait() # Now we must wait here to prevent QThread destroyed while running
