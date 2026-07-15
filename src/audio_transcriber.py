@@ -20,6 +20,7 @@ class AudioTranscriber:
         self.local_transcriber = None
         self.provider = self.client.config.get("audio_provider", "Groq API")
         self.model_size = self.client.config.get("local_whisper_model", "base")
+        self.whisper_device = self.client.config.get("whisper_device", "auto")
 
         # Ensure temp directory exists
         self.temp_dir = "outputs/temp_audio"
@@ -56,7 +57,12 @@ class AudioTranscriber:
         # Initialize Local Whisper lazily in the background thread to avoid freezing GUI or silent crashes during init
         if self.provider == "Local Whisper (CPU/GPU)":
             try:
-                self.local_transcriber = LocalWhisperTranscriber(model_size=self.model_size)
+                self.local_transcriber = LocalWhisperTranscriber(model_size=self.model_size, device=self.whisper_device)
+
+                # Expose the signal so the CaptureWorker can catch it and forward to GUI
+                if hasattr(self, 'on_model_loaded_callback') and self.on_model_loaded_callback:
+                    self.local_transcriber.signals.model_loaded.connect(self.on_model_loaded_callback)
+
                 # Pre-load model asynchronously
                 self.local_transcriber.load_model_async()
             except Exception as e:

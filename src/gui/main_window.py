@@ -83,8 +83,24 @@ class SettingsDialog(QDialog):
         self.local_model_combo = QComboBox()
         self.local_model_combo.addItems(["tiny", "base", "small", "medium"])
         self.local_model_combo.setCurrentText(self.config_manager.get("local_whisper_model", "base"))
-        self.local_model_label = QLabel("Локальная модель:")
+        self.local_model_label = QLabel("Размер модели:")
         audio_layout.addRow(self.local_model_label, self.local_model_combo)
+
+        self.whisper_device_combo = QComboBox()
+        self.whisper_device_combo.addItems(["auto", "gpu", "cpu"])
+        self.whisper_device_combo.setItemText(0, "Авто (Пытаться GPU, иначе CPU)")
+        self.whisper_device_combo.setItemText(1, "GPU (CUDA)")
+        self.whisper_device_combo.setItemText(2, "CPU")
+        current_device = self.config_manager.get("whisper_device", "auto")
+        if current_device == "auto":
+            self.whisper_device_combo.setCurrentIndex(0)
+        elif current_device == "gpu":
+            self.whisper_device_combo.setCurrentIndex(1)
+        else:
+            self.whisper_device_combo.setCurrentIndex(2)
+
+        self.whisper_device_label = QLabel("Устройство (CPU/GPU):")
+        audio_layout.addRow(self.whisper_device_label, self.whisper_device_combo)
 
         self.local_model_hint = QLabel("")
         self.local_model_hint.setStyleSheet("color: #aaaaaa; font-style: italic; font-size: 11px;")
@@ -178,6 +194,8 @@ class SettingsDialog(QDialog):
                 self.audio_url_input.setText("http://localhost:1234/v1/audio/transcriptions")
             self.local_model_label.hide()
             self.local_model_combo.hide()
+            self.whisper_device_label.hide()
+            self.whisper_device_combo.hide()
             self.local_model_hint.hide()
             if hasattr(self, 'btn_open_cache'):
                 self.btn_open_cache.hide()
@@ -186,6 +204,8 @@ class SettingsDialog(QDialog):
             self.audio_url_input.hide()
             self.local_model_label.show()
             self.local_model_combo.show()
+            self.whisper_device_label.show()
+            self.whisper_device_combo.show()
             self.local_model_hint.show()
             if hasattr(self, 'btn_open_cache'):
                 self.btn_open_cache.show()
@@ -234,6 +254,15 @@ class SettingsDialog(QDialog):
         config["audio_provider"] = self.audio_provider_combo.currentText()
         config["audio_api_url"] = self.audio_url_input.text()
         config["local_whisper_model"] = self.local_model_combo.currentText()
+
+        idx = self.whisper_device_combo.currentIndex()
+        if idx == 0:
+            config["whisper_device"] = "auto"
+        elif idx == 1:
+            config["whisper_device"] = "gpu"
+        else:
+            config["whisper_device"] = "cpu"
+
         config["enable_hotkey"] = self.enable_hotkey_cb.isChecked()
         config["hotkey_combo"] = self.hotkey_combo_input.text()
         config["min_volume_db"] = self.min_volume_slider.value()
@@ -552,12 +581,19 @@ class MainWindow(QMainWindow):
             self.capture_worker = CaptureWorker(self.session_manager)
             self.capture_worker.new_event.connect(self.on_new_event)
             self.capture_worker.status_changed.connect(self.status_bar.showMessage)
+            self.capture_worker.model_load_error.connect(self.on_model_load_error)
             self.capture_worker.start()
         except Exception as e:
             self.btn_start.setEnabled(True)
             self.btn_stop.setEnabled(False)
             QMessageBox.critical(self, "Ошибка", f"Не удалось запустить запись:\n{str(e)}")
             return
+
+    @Slot(str)
+    def on_model_load_error(self, error_msg):
+        # We stop recording immediately since GPU failed and CPU fallback was disabled
+        self.stop_recording()
+        QMessageBox.critical(self, "Ошибка инициализации GPU", f"Не удалось инициализировать видеокарту:\n\n{error_msg}\n\nПожалуйста, выберите 'CPU' или 'Auto' в настройках.")
 
     def stop_recording(self):
         self.btn_start.setEnabled(True)
