@@ -5,5 +5,16 @@
   "temperature": 0.8,
   "max_tokens": 1500,
   "timeout": 120,
-  "genre": "fantasy"
+  "genre": "fantasy",
+  "save_screenshots": true,
+  "screenshots_path": "/app/outputs/screenshots",
+  "llm_provider": "LM Studio",
+  "groq_token": "",
+  "groq_model": "llama-3.1-8b-instant",
+  "audio_provider": "Groq API",
+  "audio_api_url": "https://api.groq.com/openai/v1/audio/transcriptions",
+  "local_whisper_model": "base",
+  "enable_hotkey": true,
+  "hotkey_combo": "ctrl+shift+f11",
+  "min_volume_db": -25
 }
