@@ -7,6 +7,7 @@ from src.prompt_builder import PromptBuilder
 from src.deduplicator import Deduplicator
 from src.entity_extractor import EntityExtractor
 from src.context_selector import ContextSelector
+from src.time_segmenter import TimeGapSegmenter
 from src.utils.path_utils import get_path
 
 class StoryGenerator:
@@ -22,6 +23,7 @@ class StoryGenerator:
         self.builder = PromptBuilder()
         self.deduplicator = Deduplicator()
         self.extractor = EntityExtractor()
+        self.segmenter = TimeGapSegmenter(self.config_manager)
 
     def generate_story_from_log(self, log_path, output_path=None, genre=None, max_events=100, entities_context=""):
         provider = self.config_manager.get("llm_provider", "LM Studio")
@@ -35,6 +37,9 @@ class StoryGenerator:
 
         # Apply Phase 4 Smart Improvements
         events = self.deduplicator.filter_similar_events(events)
+
+        # Apply Time-Gap Segmentation
+        events = self.segmenter.segment_events(events)
 
         if not events:
             raise Exception("Лог пуст или не содержит значимых событий. Невозможно сгенерировать рассказ.")
