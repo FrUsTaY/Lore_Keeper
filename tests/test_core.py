@@ -63,7 +63,7 @@ def test_deduplicator():
 def test_context_selector():
     from src.context_selector import ContextSelector
     # Very small token limit to force sampling
-    selector = ContextSelector(max_tokens=10) # ~30 chars
+    selector = ContextSelector(max_context_tokens=10) # ~30 chars
 
     events = [
         {"timestamp": "1", "text": "1234567890"},
@@ -82,7 +82,7 @@ def test_context_selector():
 
 def test_context_selector_start_events():
     from src.context_selector import ContextSelector
-    selector = ContextSelector(max_tokens=10) # max 30 chars
+    selector = ContextSelector(max_context_tokens=10) # max 30 chars
     events = [
         {"timestamp": "1", "text": "12345"}, # 5 chars
         {"timestamp": "2", "text": "67890"}, # 5 chars
@@ -99,7 +99,7 @@ def test_context_selector_start_events():
 
 def test_context_selector_helpers():
     from src.context_selector import ContextSelector
-    selector = ContextSelector(max_tokens=10)
+    selector = ContextSelector(max_context_tokens=10)
 
     events = [
         {"timestamp": "1", "text": "aaaa"}, # 4
