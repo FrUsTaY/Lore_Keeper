@@ -88,19 +88,20 @@ class AudioTranscriber:
 
                 start_time = time.time()
 
-                # Transcribe
-                if self.provider == "Local Whisper (CPU/GPU)" and self.local_transcriber:
-                    text = self.local_transcriber.transcribe(filename)
-                elif self.provider != "Local Whisper (CPU/GPU)":
-                    text = self.client.transcribe_audio(filename)
-                else:
-                    text = "" # Fallback if local transcriber failed to load
-
-                # Remove temp file
                 try:
-                    os.remove(filename)
-                except OSError as e:
-                    logging.warning(f"Failed to remove temp file {filename}: {e}")
+                    # Transcribe
+                    if self.provider == "Local Whisper (CPU/GPU)" and self.local_transcriber:
+                        text = self.local_transcriber.transcribe(filename)
+                    elif self.provider != "Local Whisper (CPU/GPU)":
+                        text = self.client.transcribe_audio(filename)
+                    else:
+                        text = "" # Fallback if local transcriber failed to load
+                finally:
+                    # Remove temp file
+                    try:
+                        os.remove(filename)
+                    except OSError as e:
+                        logging.warning(f"Failed to remove temp file {filename}: {e}")
 
                 if text and text.strip():
                     # Check if it's a hallucination or meaningless

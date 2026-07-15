@@ -82,10 +82,11 @@ class TriggerManager:
                 consecutive_errors = 0
 
             except Exception as e:
-                print(f"Error in TriggerManager loop: {e}")
+                import logging
+                logging.error(f"Error in TriggerManager loop: {e}")
                 consecutive_errors += 1
                 if consecutive_errors > 10:
-                    print("Too many consecutive errors. Stopping TriggerManager.")
+                    logging.critical("Too many consecutive errors. Stopping TriggerManager.")
                     self.stop()
                     break
                 time.sleep(1.0) # Pause briefly on error
