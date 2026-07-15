@@ -7,6 +7,8 @@ def test_build_system_prompt_valid_genre():
     assert "неоновый рассказ" in prompt
     assert "киберпанк" in prompt
     assert "Важный контекст:" not in prompt
+    assert "ДОПОЛНИТЕЛЬНЫЕ ПРАВИЛА:" in prompt
+    assert "<--- СМЕНА СЦЕНЫ / ПРОШЛО ВРЕМЯ --->" in prompt
 
 def test_build_system_prompt_default_genre():
     builder = PromptBuilder()
