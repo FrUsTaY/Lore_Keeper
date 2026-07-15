@@ -55,7 +55,7 @@ def test_record_chunk_success():
     ac.stream.read.side_effect = mock_read
 
     # Record for 0.1 seconds, silence threshold 0.01
-    audio_float = ac.record_chunk(duration=0.1, silence_threshold=0.01)
+    audio_float = ac.record_chunk(duration=0.1, min_volume_db=-25)
 
     assert audio_float is not None
     assert audio_float.dtype == np.float32
@@ -76,7 +76,7 @@ def test_record_chunk_silence():
     ac.stream.read.side_effect = mock_read
 
     # Record for 0.1 seconds, silence threshold 0.01
-    audio_float = ac.record_chunk(duration=0.1, silence_threshold=0.01)
+    audio_float = ac.record_chunk(duration=0.1, min_volume_db=-25)
 
     assert audio_float is None
 
@@ -96,7 +96,7 @@ def test_record_chunk_callback_interruption():
         # Stop after 2 chunks
         return count[0] <= 2
 
-    audio_float = ac.record_chunk(duration=1.0, silence_threshold=0.01, is_running_callback=is_running_callback)
+    audio_float = ac.record_chunk(duration=1.0, min_volume_db=-25, is_running_callback=is_running_callback)
 
     # It read 2 chunks, so it's very short. Should return float data or None depending on size.
     # Since we use random noise, it might pass the volume test.

@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTabWidget, QTextEdit, QListWidget, QLabel, QStatusBar, QMessageBox,
     QSystemTrayIcon, QMenu, QDialog, QFormLayout, QLineEdit, QComboBox, QCheckBox,
-    QApplication, QListWidgetItem
+    QApplication, QListWidgetItem, QSlider
 )
 from PySide6.QtCore import Qt, Slot, Signal
 from PySide6.QtGui import QAction
@@ -102,6 +102,21 @@ class SettingsDialog(QDialog):
 
         self.local_model_combo.currentTextChanged.connect(self.update_local_model_hint)
         self.update_local_model_hint(self.local_model_combo.currentText())
+
+        # Volume threshold slider
+        self.min_volume_slider = QSlider(Qt.Horizontal)
+        self.min_volume_slider.setRange(-60, 0)
+        self.min_volume_slider.setSingleStep(1)
+        self.min_volume_slider.setValue(self.config_manager.get("min_volume_db", -25))
+
+        self.min_volume_label = QLabel(f"{self.min_volume_slider.value()} dB")
+        self.min_volume_slider.valueChanged.connect(lambda v: self.min_volume_label.setText(f"{v} dB"))
+
+        volume_layout = QHBoxLayout()
+        volume_layout.addWidget(self.min_volume_slider)
+        volume_layout.addWidget(self.min_volume_label)
+
+        audio_layout.addRow("Минимальная громкость:", volume_layout)
 
         audio_group.setLayout(audio_layout)
         main_layout.addWidget(audio_group)
@@ -221,6 +236,7 @@ class SettingsDialog(QDialog):
         config["local_whisper_model"] = self.local_model_combo.currentText()
         config["enable_hotkey"] = self.enable_hotkey_cb.isChecked()
         config["hotkey_combo"] = self.hotkey_combo_input.text()
+        config["min_volume_db"] = self.min_volume_slider.value()
 
         # Remove old Tesseract path if it exists
         if "tesseract_path" in config:

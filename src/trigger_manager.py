@@ -12,7 +12,7 @@ class TriggerManager:
             self.config = json.load(f)
 
         self.audio_chunk_duration = self.config.get("audio_chunk_duration", 8.0)
-        self.silence_threshold = self.config.get("silence_threshold", 0.005)
+
 
         # Still keep mss for screenshots if needed
         from src.screen_capture import ScreenCapture
@@ -20,6 +20,7 @@ class TriggerManager:
 
         from src.config_manager import ConfigManager
         self.cm = ConfigManager()
+        self.min_volume_db = self.cm.get("min_volume_db", -25)
 
         # Init Groq
         from src.groq_client import GroqClient
@@ -67,7 +68,7 @@ class TriggerManager:
                 timestamp = datetime.now().isoformat()
                 audio_data = self.audio_capture.record_chunk(
                     duration=self.audio_chunk_duration,
-                    silence_threshold=self.silence_threshold,
+                    min_volume_db=self.min_volume_db,
                     is_running_callback=lambda: self.is_running
                 )
 
