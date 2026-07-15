@@ -123,7 +123,8 @@ class AudioCapture:
 
         except OSError as e:
             # Device might have disconnected, reset index and stream
-            print(f"Audio capture error: {e}")
+            import logging
+            logging.error(f"Audio capture error (possible device disconnect): {e}")
             self.stop_stream()
             self.device_index = None
             raise
