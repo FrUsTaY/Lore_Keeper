@@ -2,6 +2,12 @@ import os
 import ctypes
 import threading
 import logging
+import sys
+import site
+from PySide6.QtCore import QObject, Signal
+
+class LocalWhisperSignals(QObject):
+    model_loaded = Signal(bool, str)
 
 class FasterWhisperEngine:
     def __init__(self, model_size):
@@ -121,53 +127,110 @@ class WhisperCppEngine:
         return " ".join(text_parts).strip()
 
 class LocalWhisperTranscriber:
-    def __init__(self, model_size="base"):
+    def __init__(self, model_size="base", device="auto"):
         self.model_size = model_size
+        self.device = device
         self.engine = None
         self.is_loading = False
         self.is_ready = False
+        self.signals = LocalWhisperSignals()
 
-    def load_model_async(self, callback=None):
+    def load_model_async(self):
         if self.is_loading or self.is_ready:
             return
 
         self.is_loading = True
 
         def load_task():
-            print(f"[Local Whisper Adapter] Starting initialization for model size '{self.model_size}'...")
+            print(f"[Local Whisper Adapter] Starting initialization for model size '{self.model_size}' (device={self.device})...")
 
             try:
+                # Add DLL paths if we are on Windows and not forcing CPU
+                if os.name == 'nt' and self.device in ['auto', 'gpu']:
+                    site_packages = site.getsitepackages()
+                    site_packages.append(site.getusersitepackages())
+                    if hasattr(sys, 'real_prefix') or sys.prefix != sys.base_prefix:
+                        # Inside virtualenv or venv
+                        site_packages.insert(0, os.path.join(sys.prefix, 'Lib', 'site-packages'))
+
+                    for sp in site_packages:
+                        cublas_path = os.path.join(sp, 'nvidia', 'cublas', 'bin')
+                        cudnn_path = os.path.join(sp, 'nvidia', 'cudnn', 'bin')
+                        cuda_rt_path = os.path.join(sp, 'nvidia', 'cuda_runtime', 'bin')
+
+                        for p in [cublas_path, cudnn_path, cuda_rt_path]:
+                            if os.path.exists(p):
+                                try:
+                                    os.add_dll_directory(p)
+                                    print(f"[Local Whisper Adapter] Added DLL directory: {p}")
+                                except Exception as dll_err:
+                                    print(f"[Local Whisper Adapter] Failed to add DLL directory {p}: {dll_err}")
+
                 cuda_available = False
-                try:
-                    ctypes.CDLL('nvcuda.dll')
-                    cuda_available = True
-                    print("[Local Whisper Adapter] NVIDIA CUDA detected (nvcuda.dll loaded).")
-                except Exception as e:
-                    print(f"[Local Whisper Adapter] CUDA not detected or nvcuda.dll missing: {e}")
+                cuda_error_msg = ""
+
+                if self.device in ['auto', 'gpu']:
+                    # Try loading basic nvcuda.dll first
+                    try:
+                        ctypes.CDLL('nvcuda.dll')
+                        print("[Local Whisper Adapter] NVIDIA CUDA detected (nvcuda.dll loaded).")
+                        cuda_available = True
+                    except Exception as e:
+                        cuda_error_msg = f"nvcuda.dll not found: {e}"
+                        print(f"[Local Whisper Adapter] {cuda_error_msg}")
+
+                    if cuda_available and os.name == 'nt':
+                        # Check critical DLLs for faster-whisper (CTranslate2/cuDNN)
+                        test_dlls = ['cublas64_12.dll', 'cudnn_ops_infer64_8.dll']
+                        for dll in test_dlls:
+                            try:
+                                ctypes.WinDLL(dll)
+                                print(f"[Local Whisper Adapter] Successfully tested load of {dll}")
+                            except OSError as e:
+                                cuda_available = False
+                                winerror = getattr(e, 'winerror', 'Unknown')
+                                cuda_error_msg = f"Missing DLL: {dll} (WinError {winerror})"
+                                print(f"[Local Whisper Adapter] {cuda_error_msg}")
+                                break
+
+                if self.device == 'gpu' and not cuda_available:
+                    raise RuntimeError(f"GPU initialization failed: {cuda_error_msg}. Fallback to CPU is disabled in settings.")
 
                 if cuda_available:
                     print("[Local Whisper Adapter] Selecting FasterWhisperEngine (GPU mode).")
                     self.engine = FasterWhisperEngine(self.model_size)
                     try:
                         self.engine.load()
+                        self.is_ready = True
+                        self.signals.model_loaded.emit(True, "Loaded on GPU")
+                        return
                     except Exception as e:
-                        print(f"[Local Whisper Adapter] FasterWhisperEngine failed: {e}. Falling back to CPU Engine.")
-                        cuda_available = False
+                        error_msg = f"FasterWhisperEngine failed: {e}"
+                        print(f"[Local Whisper Adapter] {error_msg}")
+                        if self.device == 'gpu':
+                            raise RuntimeError(f"GPU initialization failed during model load: {e}. Fallback to CPU is disabled.")
+                        else:
+                            print("[Local Whisper Adapter] Falling back to CPU Engine.")
+                            cuda_available = False
+                            self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({error_msg}). Автоматически переключено на CPU")
 
-                if not cuda_available:
-                    print("[Local Whisper Adapter] Selecting WhisperCppEngine (CPU fallback mode).")
+                if not cuda_available or self.device == 'cpu':
+                    print("[Local Whisper Adapter] Selecting WhisperCppEngine (CPU mode).")
                     self.engine = WhisperCppEngine(self.model_size)
                     self.engine.load()
+                    self.is_ready = True
 
-                self.is_ready = True
-                if callback:
-                    callback(True)
+                    if self.device == 'auto' and cuda_error_msg:
+                        # Emitting False with the message so the warning is shown, but we actually loaded CPU
+                        # CaptureWorker handles this via status_changed string
+                        self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({cuda_error_msg}). Автоматически переключено на CPU")
+                    else:
+                        self.signals.model_loaded.emit(True, "Loaded on CPU")
 
             except Exception as e:
                 print(f"\n[CRITICAL ERROR] Error loading local Whisper model via Adapter: {e}")
                 self.is_ready = False
-                if callback:
-                    callback(False)
+                self.signals.model_loaded.emit(False, str(e))
             finally:
                 self.is_loading = False
 

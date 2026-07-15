@@ -8,6 +8,7 @@ from src.story_generator import StoryGenerator
 class CaptureWorker(QThread):
     new_event = Signal(str, str) # timestamp, text
     status_changed = Signal(str)
+    model_load_error = Signal(str) # Special signal for hard GUI error dialogs
 
     def __init__(self, session_manager):
         super().__init__()
@@ -24,7 +25,22 @@ class CaptureWorker(QThread):
             self.new_event.emit(timestamp, text)
 
         self.trigger_manager.logger.log_event = intercepted_log
+
+        # Attach callback for local whisper signal
+        if hasattr(self.trigger_manager, 'transcriber'):
+            self.trigger_manager.transcriber.on_model_loaded_callback = self._on_model_loaded
+
         self.is_running = False
+
+    def _on_model_loaded(self, success, message):
+        if success:
+            self.status_changed.emit(f"Recording ({message})")
+        else:
+            # If it's a hard error (fallback is disabled), we want to emit an error specifically
+            # to be caught by the main window to show a MessageBox, or update status bar
+            self.status_changed.emit(f"Ошибка Whisper: {message}")
+            if "Fallback to CPU is disabled" in message:
+                self.model_load_error.emit(message)
 
     def run(self):
         self.is_running = True
