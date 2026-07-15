@@ -1,7 +1,7 @@
 class ContextSelector:
-    def __init__(self, max_tokens=1500):
+    def __init__(self, max_context_tokens=1500):
         # 1 token roughly = 4 chars in Russian, but let's be conservative
-        self.max_chars = max_tokens * 3
+        self.max_chars = max_context_tokens * 3
 
     def select_events(self, events):
         """

@@ -48,7 +48,7 @@ class StoryGenerator:
         if extracted_entities:
             entities_context = (entities_context + " " + extracted_entities).strip()
 
-        context_selector = ContextSelector(max_tokens=self.config_manager.get("max_tokens", 1500))
+        context_selector = ContextSelector(max_context_tokens=self.config_manager.get("max_context_tokens", 1500))
         events = context_selector.select_events(events)
 
         genre = genre or self.config_manager.get("genre", "fantasy")
