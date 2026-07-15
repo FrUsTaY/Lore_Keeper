@@ -32,7 +32,8 @@ class ConfigManager:
                 "audio_api_url": "https://api.groq.com/openai/v1/audio/transcriptions",
                 "local_whisper_model": "base",
                 "enable_hotkey": True,
-                "hotkey_combo": "ctrl+shift+f11"
+                "hotkey_combo": "ctrl+shift+f11",
+                "min_volume_db": -25
             }
 
     def save_config(self, new_config):

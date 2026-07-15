@@ -80,7 +80,7 @@ class AudioCapture:
                 pass
             self.stream = None
 
-    def record_chunk(self, duration=10.0, silence_threshold=0.01, is_running_callback=None):
+    def record_chunk(self, duration=10.0, min_volume_db=-25, is_running_callback=None):
         """Reads from the open stream for `duration` seconds."""
         if not self.p:
             # Mock behavior for testing on linux
@@ -114,9 +114,10 @@ class AudioCapture:
             # Normalize to float32 [-1.0, 1.0] for processing
             audio_float = audio_data.astype(np.float32) / 32768.0
 
-            # Check volume (if stereo, mean across all works fine for RMS)
+            # Check volume in dB
             rms = np.sqrt(np.mean(audio_float**2))
-            if rms < silence_threshold:
+            volume_db = 20 * np.log10(rms + 1e-10) # add small epsilon to avoid log10(0)
+            if volume_db < min_volume_db:
                 return None
 
             return audio_float
