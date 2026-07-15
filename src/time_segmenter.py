@@ -4,9 +4,14 @@ class TimeGapSegmenter:
     def __init__(self, config_manager=None):
         self.config_manager = config_manager
         # Fallback to 2 minutes if config_manager is not provided
-        self.time_gap_limit_minutes = 2
+        raw_limit = 2
         if self.config_manager:
-            self.time_gap_limit_minutes = self.config_manager.get("time_gap_limit_minutes", 2)
+            raw_limit = self.config_manager.get("time_gap_limit_minutes", 2)
+
+        try:
+            self.time_gap_limit_minutes = float(raw_limit)
+        except (ValueError, TypeError):
+            self.time_gap_limit_minutes = 2.0
 
     def segment_events(self, events):
         """

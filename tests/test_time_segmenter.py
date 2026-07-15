@@ -68,3 +68,20 @@ def test_time_segmenter_custom_config():
     segmented = segmenter.segment_events(events2)
     assert len(segmented) == 3
     assert segmented[1]["text"] == "<--- СМЕНА СЦЕНЫ / ПРОШЛО ВРЕМЯ --->"
+
+def test_time_segmenter_string_config():
+    config = MockConfigManager({"time_gap_limit_minutes": "10"}) # String value
+    segmenter = TimeGapSegmenter(config)
+
+    events = [
+        {"timestamp": "2023-10-25T10:00:00", "text": "Event 1"},
+        {"timestamp": "2023-10-25T10:15:00", "text": "Event 2"} # 15 mins gap
+    ]
+    segmented = segmenter.segment_events(events)
+    assert len(segmented) == 3
+    assert segmented[1]["text"] == "<--- СМЕНА СЦЕНЫ / ПРОШЛО ВРЕМЯ --->"
+
+def test_time_segmenter_invalid_config():
+    config = MockConfigManager({"time_gap_limit_minutes": "invalid"})
+    segmenter = TimeGapSegmenter(config)
+    assert segmenter.time_gap_limit_minutes == 2.0 # Default fallback
