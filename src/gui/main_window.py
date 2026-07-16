@@ -208,32 +208,7 @@ class SettingsDialog(QDialog):
         main_layout.addLayout(btn_layout)
 
         # Initial states
-        self.on_provider_changed(self.provider_combo.currentText())
-        self.on_audio_provider_changed(self.audio_provider_combo.currentText())
-
-    def on_audio_provider_changed(self, text):
-        if text == "Облачный (Groq API)":
-            self.audio_url_label.show()
-            self.audio_url_input.show()
-            self.audio_url_input.setText("https://api.groq.com/openai/v1/audio/transcriptions")
-            self.audio_url_input.setReadOnly(True)
-            self.local_model_label.hide()
-            self.local_model_combo.hide()
-            self.whisper_device_label.hide()
-            self.whisper_device_combo.hide()
-            self.local_model_hint.hide()
-            if hasattr(self, 'btn_open_cache'):
-                self.btn_open_cache.hide()
-        else: # Локальный (Встроенный движок)
-            self.audio_url_label.hide()
-            self.audio_url_input.hide()
-            self.local_model_label.show()
-            self.local_model_combo.show()
-            self.whisper_device_label.show()
-            self.whisper_device_combo.show()
-            self.local_model_hint.show()
-            if hasattr(self, 'btn_open_cache'):
-                self.btn_open_cache.show()
+        self.update_visibility()
 
     def open_huggingface_cache(self):
         try:
