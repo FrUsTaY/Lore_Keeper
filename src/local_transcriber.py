@@ -217,15 +217,15 @@ class LocalWhisperTranscriber:
                 if not cuda_available or self.device == 'cpu':
                     print("[Local Whisper Adapter] Selecting WhisperCppEngine (CPU mode).")
                     self.engine = WhisperCppEngine(self.model_size)
-                    self.engine.load()
-                    self.is_ready = True
 
                     if self.device == 'auto' and cuda_error_msg:
-                        # Emitting False with the message so the warning is shown, but we actually loaded CPU
-                        # CaptureWorker handles this via status_changed string
-                        self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({cuda_error_msg}). Автоматически переключено на CPU")
+                        self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({cuda_error_msg}). Автоматически переключено на CPU. Начинается загрузка модели...")
                     else:
-                        self.signals.model_loaded.emit(True, "Loaded on CPU")
+                        self.signals.model_loaded.emit(True, "Инициализация и загрузка CPU модели (может занять время)...")
+
+                    self.engine.load()
+                    self.is_ready = True
+                    self.signals.model_loaded.emit(True, "Loaded on CPU")
 
             except Exception as e:
                 print(f"\n[CRITICAL ERROR] Error loading local Whisper model via Adapter: {e}")
