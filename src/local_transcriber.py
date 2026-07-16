@@ -96,10 +96,7 @@ class WhisperCppEngine:
         import soundfile as sf
         import numpy as np
 
-        # librosa is standard for resampling, but we don't have it in requirements.
-        # Let's try native soundfile / scipy if we need to resample, or rely on whisper_cpp internal tools if available.
         # pywhispercpp Model.transcribe(audio) -> audio is 1D array of type float32 at 16kHz
-        import scipy.signal
 
         audio_data, sr = sf.read(file_path, dtype='float32')
         if len(audio_data.shape) > 1:
@@ -107,9 +104,11 @@ class WhisperCppEngine:
             audio_data = np.mean(audio_data, axis=1)
 
         if sr != 16000:
-            # Resample to 16kHz using scipy
+            # Resample to 16kHz using numpy interp to avoid external heavy dependencies like scipy/librosa
             num_samples = round(len(audio_data) * float(16000) / sr)
-            audio_data = scipy.signal.resample(audio_data, num_samples)
+            old_indices = np.arange(len(audio_data))
+            new_indices = np.linspace(0, len(audio_data) - 1, num_samples)
+            audio_data = np.interp(new_indices, old_indices, audio_data).astype(np.float32)
 
         # pywhispercpp expects a numpy array.
         segments = self.model.transcribe(audio_data)
@@ -217,15 +216,15 @@ class LocalWhisperTranscriber:
                 if not cuda_available or self.device == 'cpu':
                     print("[Local Whisper Adapter] Selecting WhisperCppEngine (CPU mode).")
                     self.engine = WhisperCppEngine(self.model_size)
-                    self.engine.load()
-                    self.is_ready = True
 
                     if self.device == 'auto' and cuda_error_msg:
-                        # Emitting False with the message so the warning is shown, but we actually loaded CPU
-                        # CaptureWorker handles this via status_changed string
-                        self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({cuda_error_msg}). Автоматически переключено на CPU")
+                        self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({cuda_error_msg}). Автоматически переключено на CPU. Начинается загрузка модели...")
                     else:
-                        self.signals.model_loaded.emit(True, "Loaded on CPU")
+                        self.signals.model_loaded.emit(True, "Инициализация и загрузка CPU модели (может занять время)...")
+
+                    self.engine.load()
+                    self.is_ready = True
+                    self.signals.model_loaded.emit(True, "Loaded on CPU")
 
             except Exception as e:
                 print(f"\n[CRITICAL ERROR] Error loading local Whisper model via Adapter: {e}")
