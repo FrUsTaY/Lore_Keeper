@@ -428,6 +428,12 @@ class MainWindow(QMainWindow):
         sess_layout = QVBoxLayout(self.tab_sessions)
         self.list_sessions = QListWidget()
 
+        self.list_sessions.setContextMenuPolicy(Qt.ActionsContextMenu)
+        del_sess_action = QAction("Удалить", self)
+        del_sess_action.setShortcut("Delete")
+        del_sess_action.triggered.connect(self.delete_session)
+        self.list_sessions.addAction(del_sess_action)
+
         btn_generate = QPushButton("Сгенерировать историю из выбранной сессии")
         btn_generate.clicked.connect(self.start_generation)
 
@@ -457,6 +463,12 @@ class MainWindow(QMainWindow):
 
         self.list_stories = QListWidget()
         self.list_stories.itemClicked.connect(self.load_story_text)
+
+        self.list_stories.setContextMenuPolicy(Qt.ActionsContextMenu)
+        del_story_action = QAction("Удалить", self)
+        del_story_action.setShortcut("Delete")
+        del_story_action.triggered.connect(self.delete_story)
+        self.list_stories.addAction(del_story_action)
 
         btn_delete_story = QPushButton("Удалить выбранную историю")
         btn_delete_story.clicked.connect(self.delete_story)
