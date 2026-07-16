@@ -27,36 +27,49 @@ class SettingsDialog(QDialog):
 
         main_layout = QVBoxLayout(self)
 
+        # --- Common API Settings ---
+        self.api_group = QGroupBox("Настройка API-ключей")
+        api_layout = QFormLayout()
+
+        self.groq_token_input = QLineEdit(self.config_manager.get("groq_token", ""))
+        self.groq_token_input.setEchoMode(QLineEdit.Password)
+
+        self.btn_check_groq = QPushButton("Проверить доступные мне модели")
+        self.btn_check_groq.clicked.connect(self.check_groq_models)
+
+        groq_api_layout = QHBoxLayout()
+        groq_api_layout.addWidget(self.groq_token_input)
+        groq_api_layout.addWidget(self.btn_check_groq)
+
+        api_layout.addRow("Groq Token:", groq_api_layout)
+        self.api_group.setLayout(api_layout)
+        main_layout.addWidget(self.api_group)
+
         # --- LLM Provider Settings (for text generation) ---
-        llm_group = QGroupBox("Генерация Истории (LLM)")
+        llm_group = QGroupBox("Генерация Истории (ИИ)")
         llm_layout = QFormLayout()
 
         self.provider_combo = QComboBox()
-        self.provider_combo.addItems(["LM Studio", "Groq"])
-        self.provider_combo.setCurrentText(self.config_manager.get("llm_provider", "LM Studio"))
-        self.provider_combo.currentTextChanged.connect(self.on_provider_changed)
+        self.provider_combo.addItems(["Локально (LM Studio)", "Облако (Groq)"])
+
+        # Миграция старых значений конфига
+        current_llm_provider = self.config_manager.get("llm_provider", "Локально (LM Studio)")
+        if current_llm_provider == "LM Studio":
+            current_llm_provider = "Локально (LM Studio)"
+        elif current_llm_provider == "Groq":
+            current_llm_provider = "Облако (Groq)"
+
+        self.provider_combo.setCurrentText(current_llm_provider)
+        self.provider_combo.currentTextChanged.connect(self.update_visibility)
         llm_layout.addRow("Провайдер LLM:", self.provider_combo)
 
         self.url_input = QLineEdit(self.config_manager.get("api_url"))
         self.url_label = QLabel("LM Studio API URL:")
         llm_layout.addRow(self.url_label, self.url_input)
 
-        self.groq_token_input = QLineEdit(self.config_manager.get("groq_token", ""))
-        self.groq_token_input.setEchoMode(QLineEdit.Password)
-        self.groq_token_label = QLabel("Groq Token:")
-        llm_layout.addRow(self.groq_token_label, self.groq_token_input)
-
         self.groq_model_input = QLineEdit(self.config_manager.get("groq_model", "llama-3.1-8b-instant"))
         self.groq_model_label = QLabel("Groq Model:")
-
-        self.btn_check_groq = QPushButton("Проверить доступные мне модели")
-        self.btn_check_groq.clicked.connect(self.check_groq_models)
-
-        groq_model_layout = QHBoxLayout()
-        groq_model_layout.addWidget(self.groq_model_input)
-        groq_model_layout.addWidget(self.btn_check_groq)
-
-        llm_layout.addRow(self.groq_model_label, groq_model_layout)
+        llm_layout.addRow(self.groq_model_label, self.groq_model_input)
 
         self.genre_combo = QComboBox()
         self.genre_combo.addItems(["fantasy", "cyberpunk", "realism", "horror"])
@@ -71,20 +84,21 @@ class SettingsDialog(QDialog):
         audio_layout = QFormLayout()
 
         self.audio_provider_combo = QComboBox()
-        self.audio_provider_combo.addItems(["Облачный (Groq API)", "Локальный (Встроенный движок)"])
+        self.audio_provider_combo.addItems(["Облако (Groq API)", "Локально (Встроенный движок Faster-Whisper)"])
 
         # Миграция старых значений конфига
-        current_audio_provider = self.config_manager.get("audio_provider", "Облачный (Groq API)")
-        if current_audio_provider in ["Groq API", "LM Studio (Custom URL)"]:
-            current_audio_provider = "Облачный (Groq API)"
-        elif current_audio_provider == "Local Whisper (CPU/GPU)":
-            current_audio_provider = "Локальный (Встроенный движок)"
+        current_audio_provider = self.config_manager.get("audio_provider", "Облако (Groq API)")
+        if current_audio_provider in ["Groq API", "LM Studio (Custom URL)", "Облачный (Groq API)"]:
+            current_audio_provider = "Облако (Groq API)"
+        elif current_audio_provider in ["Local Whisper (CPU/GPU)", "Локальный (Встроенный движок)"]:
+            current_audio_provider = "Локально (Встроенный движок Faster-Whisper)"
 
         self.audio_provider_combo.setCurrentText(current_audio_provider)
-        self.audio_provider_combo.currentTextChanged.connect(self.on_audio_provider_changed)
+        self.audio_provider_combo.currentTextChanged.connect(self.update_visibility)
         audio_layout.addRow("Источник (Provider):", self.audio_provider_combo)
 
         self.audio_url_input = QLineEdit(self.config_manager.get("audio_api_url", "https://api.groq.com/openai/v1/audio/transcriptions"))
+        self.audio_url_input.setToolTip("Используется только для сторонних OpenAI-совместимых серверов. По умолчанию скрыто/неактивно")
         self.audio_url_label = QLabel("Audio API URL:")
         audio_layout.addRow(self.audio_url_label, self.audio_url_input)
 
@@ -134,13 +148,18 @@ class SettingsDialog(QDialog):
         self.local_model_combo.currentTextChanged.connect(self.update_local_model_hint)
         self.update_local_model_hint(self.local_model_combo.currentText())
 
+        # Вызовем разок для первоначальной настройки видимости
+        self.update_visibility()
+
         # Volume threshold slider
         self.min_volume_slider = QSlider(Qt.Horizontal)
         self.min_volume_slider.setRange(-60, 0)
         self.min_volume_slider.setSingleStep(1)
         self.min_volume_slider.setValue(self.config_manager.get("min_volume_db", -25))
+        self.min_volume_slider.setToolTip("Порог чувствительности. Чем ближе к -60 дБ, тем тише звуки слышит программа (чувствительнее). Рекомендуется от -25 до -35 дБ")
 
         self.min_volume_label = QLabel(f"{self.min_volume_slider.value()} dB")
+        self.min_volume_label.setToolTip("Порог чувствительности. Чем ближе к -60 дБ, тем тише звуки слышит программа (чувствительнее). Рекомендуется от -25 до -35 дБ")
         self.min_volume_slider.valueChanged.connect(lambda v: self.min_volume_label.setText(f"{v} dB"))
 
         volume_layout = QHBoxLayout()
@@ -240,17 +259,34 @@ class SettingsDialog(QDialog):
         }
         self.local_model_hint.setText(hints.get(model_size, ""))
 
-    def on_provider_changed(self, provider):
-        is_lm_studio = (provider == "LM Studio")
+    def update_visibility(self, *args):
+        llm_provider = self.provider_combo.currentText()
+        audio_provider = self.audio_provider_combo.currentText()
 
+        # Показываем блок с токеном, если выбран Groq хотя бы в одном из мест
+        show_api_group = (llm_provider == "Облако (Groq)") or (audio_provider == "Облако (Groq API)")
+        self.api_group.setVisible(show_api_group)
+
+        # Специфично для LLM
+        is_lm_studio = (llm_provider == "Локально (LM Studio)")
         self.url_label.setVisible(is_lm_studio)
         self.url_input.setVisible(is_lm_studio)
 
-        self.groq_token_label.setVisible(not is_lm_studio)
-        self.groq_token_input.setVisible(not is_lm_studio)
         self.groq_model_label.setVisible(not is_lm_studio)
         self.groq_model_input.setVisible(not is_lm_studio)
-        self.btn_check_groq.setVisible(not is_lm_studio)
+
+        # Специфично для Аудио
+        is_local_audio = (audio_provider == "Локально (Встроенный движок Faster-Whisper)")
+
+        self.audio_url_label.setVisible(not is_local_audio)
+        self.audio_url_input.setVisible(not is_local_audio)
+
+        self.local_model_label.setVisible(is_local_audio)
+        self.local_model_combo.setVisible(is_local_audio)
+        self.whisper_device_label.setVisible(is_local_audio)
+        self.whisper_device_combo.setVisible(is_local_audio)
+        self.local_model_hint.setVisible(is_local_audio)
+        self.btn_open_cache.setVisible(is_local_audio)
 
     def save_settings(self):
         config = self.config_manager.config
@@ -670,6 +706,17 @@ class MainWindow(QMainWindow):
         dlg = SettingsDialog(self.config_manager, self)
         dlg.exec()
         self.setup_hotkey()
+        self.on_settings_saved()
+
+    def on_settings_saved(self):
+        # Применяем громкость "на лету" если идет запись
+        new_volume = self.config_manager.get("min_volume_db", -25)
+        if self.capture_worker and self.capture_worker.is_running:
+            if hasattr(self.capture_worker.trigger_manager, 'min_volume_db'):
+                self.capture_worker.trigger_manager.min_volume_db = new_volume
+                import logging
+                logging.info(f"Динамически обновлена минимальная громкость: {new_volume} dB")
+                print(f"Динамически обновлена минимальная громкость: {new_volume} dB")
 
     def delete_session(self):
         selected = self.list_sessions.currentItem()
@@ -703,7 +750,7 @@ class MainWindow(QMainWindow):
             return
 
         filepath = selected.data(Qt.UserRole)
-        provider = self.config_manager.get("llm_provider", "LM Studio")
+        provider = self.config_manager.get("llm_provider", "Локально (LM Studio)")
 
         self.status_bar.showMessage(f"Обращение к {provider} для генерации истории...")
 

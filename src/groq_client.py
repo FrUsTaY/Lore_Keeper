@@ -99,11 +99,11 @@ class GroqClient:
 
     def transcribe_audio(self, file_path, retries=3):
         """Sends an audio file to an OpenAI-compatible Whisper API for transcription."""
-        provider = self.config.get("audio_provider", "Groq API")
+        provider = self.config.get("audio_provider", "Облако (Groq API)")
 
         # If it's local whisper, this method shouldn't be called (handled in transcriber),
         # but just in case, we do nothing here.
-        if provider == "Local Whisper (CPU/GPU)":
+        if provider in ["Local Whisper (CPU/GPU)", "Локальный (Встроенный движок)", "Локально (Встроенный движок Faster-Whisper)"]:
             return ""
 
         url = self.config.get("audio_api_url", "https://api.groq.com/openai/v1/audio/transcriptions")

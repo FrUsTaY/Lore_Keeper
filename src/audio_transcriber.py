@@ -20,11 +20,11 @@ class AudioTranscriber:
         self.local_transcriber = None
 
         # Миграция
-        provider = self.client.config.get("audio_provider", "Облачный (Groq API)")
-        if provider in ["Groq API", "LM Studio (Custom URL)"]:
-            self.provider = "Облачный (Groq API)"
-        elif provider == "Local Whisper (CPU/GPU)":
-            self.provider = "Локальный (Встроенный движок)"
+        provider = self.client.config.get("audio_provider", "Облако (Groq API)")
+        if provider in ["Groq API", "LM Studio (Custom URL)", "Облачный (Groq API)"]:
+            self.provider = "Облако (Groq API)"
+        elif provider in ["Local Whisper (CPU/GPU)", "Локальный (Встроенный движок)"]:
+            self.provider = "Локально (Встроенный движок Faster-Whisper)"
         else:
             self.provider = provider
 
@@ -64,7 +64,7 @@ class AudioTranscriber:
 
     def _process_queue(self):
         # Initialize Local Whisper lazily in the background thread to avoid freezing GUI or silent crashes during init
-        if self.provider == "Локальный (Встроенный движок)":
+        if self.provider == "Локально (Встроенный движок Faster-Whisper)":
             try:
                 self.local_transcriber = LocalWhisperTranscriber(model_size=self.model_size, device=self.whisper_device)
 
@@ -81,7 +81,7 @@ class AudioTranscriber:
 
         while self.is_running:
             # Check if using local provider and it's still loading
-            if self.provider == "Локальный (Встроенный движок)" and self.local_transcriber:
+            if self.provider == "Локально (Встроенный движок Faster-Whisper)" and self.local_transcriber:
                 if not self.local_transcriber.is_ready:
                     if self.local_transcriber.is_loading:
                         # If model is actively loading, sleep and continue so chunks queue up without blocking
@@ -105,9 +105,9 @@ class AudioTranscriber:
 
                 try:
                     # Transcribe
-                    if self.provider == "Локальный (Встроенный движок)" and self.local_transcriber:
+                    if self.provider == "Локально (Встроенный движок Faster-Whisper)" and self.local_transcriber:
                         text = self.local_transcriber.transcribe(filename)
-                    elif self.provider == "Облачный (Groq API)":
+                    elif self.provider == "Облако (Groq API)":
                         text = self.client.transcribe_audio(filename)
                     else:
                         text = "" # Fallback if local transcriber failed to load
