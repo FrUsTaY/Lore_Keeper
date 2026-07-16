@@ -96,10 +96,7 @@ class WhisperCppEngine:
         import soundfile as sf
         import numpy as np
 
-        # librosa is standard for resampling, but we don't have it in requirements.
-        # Let's try native soundfile / scipy if we need to resample, or rely on whisper_cpp internal tools if available.
         # pywhispercpp Model.transcribe(audio) -> audio is 1D array of type float32 at 16kHz
-        import scipy.signal
 
         audio_data, sr = sf.read(file_path, dtype='float32')
         if len(audio_data.shape) > 1:
@@ -107,9 +104,11 @@ class WhisperCppEngine:
             audio_data = np.mean(audio_data, axis=1)
 
         if sr != 16000:
-            # Resample to 16kHz using scipy
+            # Resample to 16kHz using numpy interp to avoid external heavy dependencies like scipy/librosa
             num_samples = round(len(audio_data) * float(16000) / sr)
-            audio_data = scipy.signal.resample(audio_data, num_samples)
+            old_indices = np.arange(len(audio_data))
+            new_indices = np.linspace(0, len(audio_data) - 1, num_samples)
+            audio_data = np.interp(new_indices, old_indices, audio_data).astype(np.float32)
 
         # pywhispercpp expects a numpy array.
         segments = self.model.transcribe(audio_data)
