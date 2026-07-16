@@ -15,7 +15,7 @@ class StoryGenerator:
         self.config_manager = config_manager or ConfigManager()
         provider = self.config_manager.get("llm_provider", "LM Studio")
 
-        if provider == "Groq":
+        if provider in ["Groq", "Облако (Groq)"]:
             self.client = GroqClient(self.config_manager)
         else:
             self.client = LMStudioClient(self.config_manager)
@@ -28,7 +28,7 @@ class StoryGenerator:
     def generate_story_from_log(self, log_path, output_path=None, genre=None, max_events=100, entities_context=""):
         provider = self.config_manager.get("llm_provider", "LM Studio")
         if not self.client.check_health():
-            if provider == "Groq":
+            if provider in ["Groq", "Облако (Groq)"]:
                 raise Exception("Groq API недоступен или неверный токен.")
             else:
                 raise Exception("LM Studio недоступна. Пожалуйста, запустите сервер.")
