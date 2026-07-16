@@ -94,28 +94,29 @@ class CaptureWorker(QThread):
     new_event = Signal(str, str) # timestamp, text
     status_changed = Signal(str)
     model_load_error = Signal(str) # Special signal for hard GUI error dialogs
+    transcription_error = Signal(str)
 
     def __init__(self, session_manager):
         super().__init__()
         self.session_manager = session_manager
-        # Override logger to intercept events
         self.trigger_manager = TriggerManager(session_id=self.session_manager.current_session_id)
 
-        # We hook into the trigger manager's logger
-        original_log = self.trigger_manager.logger.log_event
-
-        def intercepted_log(timestamp, text, window_title="Game"):
-            original_log(timestamp, text, window_title)
-            self.session_manager.add_event(timestamp, text)
-            self.new_event.emit(timestamp, text)
-
-        self.trigger_manager.logger.log_event = intercepted_log
+        # Connect cleanly via callback
+        self.trigger_manager.logger.on_new_event_callback = self._on_logger_event
+        self.trigger_manager.on_transcription_error_callback = self._on_transcription_error
 
         # Attach callback for local whisper signal
         if hasattr(self.trigger_manager, 'transcriber'):
             self.trigger_manager.transcriber.on_model_loaded_callback = self._on_model_loaded
 
         self.is_running = False
+
+    def _on_logger_event(self, timestamp, text, window_title):
+        self.session_manager.add_event(timestamp, text)
+        self.new_event.emit(timestamp, text)
+
+    def _on_transcription_error(self, error_msg):
+        self.transcription_error.emit(error_msg)
 
     def _on_model_loaded(self, success, message):
         if success:

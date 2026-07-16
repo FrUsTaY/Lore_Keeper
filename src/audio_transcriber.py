@@ -9,13 +9,14 @@ from src.local_transcriber import LocalWhisperTranscriber
 import soundfile as sf
 
 class AudioTranscriber:
-    def __init__(self, groq_client: GroqClient, logger, on_transcription_callback=None):
+    def __init__(self, groq_client: GroqClient, logger, on_transcription_callback=None, on_error_callback=None):
         self.client = groq_client
         self.logger = logger
         self.queue = queue.Queue()
         self.is_running = False
         self.thread = None
         self.on_transcription = on_transcription_callback
+        self.on_error_callback = on_error_callback
 
         self.local_transcriber = None
 
@@ -138,7 +139,10 @@ class AudioTranscriber:
             except queue.Empty:
                 continue
             except Exception as e:
-                print(f"Transcription error: {e}")
+                error_msg = f"Ошибка транскрибации: {e}"
+                print(error_msg)
+                if self.on_error_callback:
+                    self.on_error_callback(error_msg)
                 time.sleep(2.0) # wait before retrying
 
     def _clean_whisper_text(self, text):
