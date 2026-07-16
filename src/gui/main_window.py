@@ -615,6 +615,7 @@ class MainWindow(QMainWindow):
             self.capture_worker.new_event.connect(self.on_new_event)
             self.capture_worker.status_changed.connect(self.status_bar.showMessage)
             self.capture_worker.model_load_error.connect(self.on_model_load_error)
+            self.capture_worker.transcription_error.connect(self.on_transcription_error)
             self.capture_worker.start()
         except Exception as e:
             self.btn_start.setEnabled(True)
@@ -688,6 +689,11 @@ class MainWindow(QMainWindow):
     def on_new_event(self, timestamp, text):
         time_str = timestamp.split("T")[-1][:8]
         self.text_live_log.append(f"[{time_str}] {text}")
+
+    @Slot(str)
+    def on_transcription_error(self, error_msg):
+        self.status_bar.showMessage(error_msg, 5000)
+        self.text_live_log.append(f"[ОШИБКА] {error_msg}")
 
     def open_settings(self):
         dlg = SettingsDialog(self.config_manager, self)
@@ -787,8 +793,16 @@ class MainWindow(QMainWindow):
 
         if self.capture_worker and self.capture_worker.is_running:
             self.capture_worker.stop()
-            self.capture_worker.wait() # Now we must wait here to prevent QThread destroyed while running
+            # Wait with a short timeout to prevent zombie process/GUI freeze
+            if not self.capture_worker.wait(2000):
+                print("CaptureWorker did not finish in time, terminating...")
+                self.capture_worker.terminate()
+                self.capture_worker.wait()
+
         if self.generation_worker and self.generation_worker.isRunning():
             self.generation_worker.quit()
-            self.generation_worker.wait()
+            if not self.generation_worker.wait(2000):
+                self.generation_worker.terminate()
+                self.generation_worker.wait()
+
         QApplication.quit()

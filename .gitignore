@@ -31,3 +31,4 @@ logs/
 outputs/
 configs/capture_config.json
 configs/lm_studio_config.json
+.coverage

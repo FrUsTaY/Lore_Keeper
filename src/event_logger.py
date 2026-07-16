@@ -11,6 +11,7 @@ class EventLogger:
         self.log_file = get_path(f"logs/raw_events_{session_id}.json")
         self.events = []
         self.schema_version = 1
+        self.on_new_event_callback = None
 
         # Ensure logs dir exists
         os.makedirs(os.path.dirname(self.log_file), exist_ok=True)
@@ -34,6 +35,9 @@ class EventLogger:
             "game_window_title": window_title
         }
         self.events.append(event)
+
+        if self.on_new_event_callback:
+            self.on_new_event_callback(timestamp, text, window_title)
 
         # Flush every 10 events
         self.flush()

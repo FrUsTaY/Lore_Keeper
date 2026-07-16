@@ -28,15 +28,22 @@ class TriggerManager:
 
         self.logger = EventLogger(session_id=session_id)
 
+        self.on_transcription_error_callback = None
+
         # Init Audio
         self.audio_capture = AudioCapture()
         self.transcriber = AudioTranscriber(
             groq_client=self.groq_client,
             logger=self.logger,
-            on_transcription_callback=self._on_transcription
+            on_transcription_callback=self._on_transcription,
+            on_error_callback=self._on_transcription_error
         )
 
         self.is_running = False
+
+    def _on_transcription_error(self, error_msg):
+        if self.on_transcription_error_callback:
+            self.on_transcription_error_callback(error_msg)
 
     def _on_transcription(self, text):
         """Called when a valid transcription is received. We can take a screenshot here."""
