@@ -684,11 +684,14 @@ class MainWindow(QMainWindow):
         self.on_settings_saved()
 
     def on_settings_saved(self):
+        # Перечитываем конфиг с диска, чтобы убедиться что get() вернет актуальные значения
+        self.config_manager.config = self.config_manager.load_config()
+
         # Применяем громкость "на лету" если идет запись
         new_volume = self.config_manager.get("min_volume_db", -25)
         if self.capture_worker and self.capture_worker.is_running:
             if hasattr(self.capture_worker.trigger_manager, 'min_volume_db'):
-                self.capture_worker.trigger_manager.min_volume_db = new_volume
+                self.capture_worker.trigger_manager.min_volume_db = int(new_volume)
                 import logging
                 logging.info(f"Динамически обновлена минимальная громкость: {new_volume} dB")
                 print(f"Динамически обновлена минимальная громкость: {new_volume} dB")
