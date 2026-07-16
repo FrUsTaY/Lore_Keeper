@@ -7,7 +7,19 @@ os.environ["MKL_DEBUG_CPU_TYPE"] = "5"    # Force correct MKL execution on AMD C
 # Prevents silent OpenMP crash in GUI applications
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
+import os
 import sys
+
+# Динамическое подключение CUDA DLL
+dll_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cuBLAS and cuDNN")
+if os.path.exists(dll_path):
+    os.environ["PATH"] = dll_path + os.pathsep + os.environ.get("PATH", "")
+    if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
+        try:
+            os.add_dll_directory(dll_path)
+        except Exception as e:
+            print(f"Ошибка добавления DLL директории: {e}")
+
 from PySide6.QtWidgets import QApplication
 from src.gui.main_window import MainWindow
 from src.utils.path_utils import ensure_required_directories
