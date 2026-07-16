@@ -23,7 +23,8 @@ class CUDADownloadWorker(QThread):
         ]
 
         # Target directory in root
-        target_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "cuBLAS and cuDNN")
+        from src.utils.path_utils import get_path
+        target_dir = get_path("cuBLAS and cuDNN")
 
         archive_path = None
         download_success = False
