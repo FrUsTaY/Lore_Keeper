@@ -5,6 +5,91 @@ import json
 from src.trigger_manager import TriggerManager
 from src.story_generator import StoryGenerator
 
+class CUDADownloadWorker(QThread):
+    progress = Signal(int)
+    status_update = Signal(str)
+    finished = Signal(bool, str)
+
+    def run(self):
+        import requests
+        import py7zr
+        import tempfile
+        import shutil
+
+        # Fallback URLs
+        urls = [
+            "https://github.com/FrUsTaY/Lore_Keeper/releases/download/v0.0.0-assets/cuBLAS.and.cuDNN_CUDA12_win_v1.7z",
+            "https://github.com/Purfview/whisper-standalone-win/releases/download/libs/cuBLAS.and.cuDNN_CUDA12_win_v1.7z"
+        ]
+
+        # Target directory in root
+        target_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "cuBLAS and cuDNN")
+
+        archive_path = None
+        download_success = False
+
+        try:
+            for url in urls:
+                self.status_update.emit(f"Подключение к серверу...")
+                try:
+                    response = requests.get(url, stream=True, timeout=10)
+                    response.raise_for_status()
+
+                    total_size = int(response.headers.get('content-length', 0))
+
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".7z") as temp_file:
+                        archive_path = temp_file.name
+                        downloaded = 0
+
+                        self.status_update.emit(f"Скачивание компонентов CUDA...")
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                temp_file.write(chunk)
+                                downloaded += len(chunk)
+                                if total_size > 0:
+                                    percent = int((downloaded / total_size) * 100)
+                                    # Reserve 0-90% for download, 90-100% for extraction
+                                    self.progress.emit(int(percent * 0.9))
+
+                    download_success = True
+                    break # Successful download
+                except requests.exceptions.RequestException as e:
+                    print(f"Failed to download from {url}: {e}")
+                    if archive_path and os.path.exists(archive_path):
+                        os.remove(archive_path)
+                    continue
+
+            if not download_success:
+                self.finished.emit(False, "Не удалось скачать архив ни с одного из зеркал. Проверьте подключение к интернету.")
+                return
+
+            self.status_update.emit("Распаковка файлов (это может занять пару минут)...")
+
+            # Ensure target directory exists and is clean
+            if os.path.exists(target_dir):
+                shutil.rmtree(target_dir)
+            os.makedirs(target_dir, exist_ok=True)
+
+            with py7zr.SevenZipFile(archive_path, mode='r') as z:
+                z.extractall(path=target_dir)
+
+            self.progress.emit(100)
+            self.finished.emit(True, "Компоненты успешно установлены! Пожалуйста, перезапустите программу, чтобы активировать ускорение на вашей видеокарте.")
+
+        except Exception as e:
+            self.finished.emit(False, f"Произошла ошибка при установке: {e}")
+            if os.path.exists(target_dir):
+                try:
+                    shutil.rmtree(target_dir)
+                except:
+                    pass
+        finally:
+            if archive_path and os.path.exists(archive_path):
+                try:
+                    os.remove(archive_path)
+                except:
+                    pass
+
 class CaptureWorker(QThread):
     new_event = Signal(str, str) # timestamp, text
     status_changed = Signal(str)

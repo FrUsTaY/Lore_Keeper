@@ -29,9 +29,9 @@ class ConfigManager:
                 "llm_provider": "LM Studio",
                 "groq_token": "",
                 "groq_model": "llama-3.1-8b-instant",
-                "audio_provider": "Groq API",
+                "audio_provider": "Облачный (Groq API)",
                 "audio_api_url": "https://api.groq.com/openai/v1/audio/transcriptions",
-                "local_whisper_model": "base",
+                "local_whisper_model": "large-v3-turbo",
                 "enable_hotkey": True,
                 "hotkey_combo": "ctrl+shift+f11",
                 "min_volume_db": -25

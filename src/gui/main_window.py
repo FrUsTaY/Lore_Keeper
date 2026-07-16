@@ -71,8 +71,16 @@ class SettingsDialog(QDialog):
         audio_layout = QFormLayout()
 
         self.audio_provider_combo = QComboBox()
-        self.audio_provider_combo.addItems(["Groq API", "LM Studio (Custom URL)", "Local Whisper (CPU/GPU)"])
-        self.audio_provider_combo.setCurrentText(self.config_manager.get("audio_provider", "Groq API"))
+        self.audio_provider_combo.addItems(["Облачный (Groq API)", "Локальный (Встроенный движок)"])
+
+        # Миграция старых значений конфига
+        current_audio_provider = self.config_manager.get("audio_provider", "Облачный (Groq API)")
+        if current_audio_provider in ["Groq API", "LM Studio (Custom URL)"]:
+            current_audio_provider = "Облачный (Groq API)"
+        elif current_audio_provider == "Local Whisper (CPU/GPU)":
+            current_audio_provider = "Локальный (Встроенный движок)"
+
+        self.audio_provider_combo.setCurrentText(current_audio_provider)
         self.audio_provider_combo.currentTextChanged.connect(self.on_audio_provider_changed)
         audio_layout.addRow("Источник (Provider):", self.audio_provider_combo)
 
@@ -81,8 +89,13 @@ class SettingsDialog(QDialog):
         audio_layout.addRow(self.audio_url_label, self.audio_url_input)
 
         self.local_model_combo = QComboBox()
-        self.local_model_combo.addItems(["tiny", "base", "small", "medium"])
-        self.local_model_combo.setCurrentText(self.config_manager.get("local_whisper_model", "base"))
+        self.local_model_combo.addItems(["small", "medium", "large-v3-turbo"])
+
+        current_model = self.config_manager.get("local_whisper_model", "large-v3-turbo")
+        if current_model not in ["small", "medium", "large-v3-turbo"]:
+            current_model = "large-v3-turbo"
+
+        self.local_model_combo.setCurrentText(current_model)
         self.local_model_label = QLabel("Размер модели:")
         audio_layout.addRow(self.local_model_label, self.local_model_combo)
 
@@ -101,6 +114,8 @@ class SettingsDialog(QDialog):
 
         self.whisper_device_label = QLabel("Устройство (CPU/GPU):")
         audio_layout.addRow(self.whisper_device_label, self.whisper_device_combo)
+
+        self.whisper_device_combo.currentTextChanged.connect(self.on_device_changed)
 
         self.local_model_hint = QLabel("")
         self.local_model_hint.setStyleSheet("color: #aaaaaa; font-style: italic; font-size: 11px;")
@@ -178,20 +193,11 @@ class SettingsDialog(QDialog):
         self.on_audio_provider_changed(self.audio_provider_combo.currentText())
 
     def on_audio_provider_changed(self, text):
-        if text == "Groq API":
+        if text == "Облачный (Groq API)":
             self.audio_url_label.show()
             self.audio_url_input.show()
             self.audio_url_input.setText("https://api.groq.com/openai/v1/audio/transcriptions")
             self.audio_url_input.setReadOnly(True)
-            self.local_model_label.hide()
-            self.local_model_combo.hide()
-            self.local_model_hint.hide()
-        elif text == "LM Studio (Custom URL)":
-            self.audio_url_label.show()
-            self.audio_url_input.show()
-            self.audio_url_input.setReadOnly(False)
-            if "groq.com" in self.audio_url_input.text():
-                self.audio_url_input.setText("http://localhost:1234/v1/audio/transcriptions")
             self.local_model_label.hide()
             self.local_model_combo.hide()
             self.whisper_device_label.hide()
@@ -199,7 +205,7 @@ class SettingsDialog(QDialog):
             self.local_model_hint.hide()
             if hasattr(self, 'btn_open_cache'):
                 self.btn_open_cache.hide()
-        else: # Local Whisper
+        else: # Локальный (Встроенный движок)
             self.audio_url_label.hide()
             self.audio_url_input.hide()
             self.local_model_label.show()
@@ -221,12 +227,16 @@ class SettingsDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Ошибка", f"Не удалось открыть папку: {e}")
 
+    def on_device_changed(self, text):
+        if text == "GPU (CUDA)" or text == "Авто (Пытаться GPU, иначе CPU)":
+            # Switch to large-v3-turbo by default when selecting GPU
+            self.local_model_combo.setCurrentText("large-v3-turbo")
+
     def update_local_model_hint(self, model_size):
         hints = {
-            "tiny": "Очень быстрая, требует ~1 ГБ ОЗУ. Низкая точность (возможны частые ошибки в словах).",
-            "base": "Быстрая, требует ~1.5 ГБ ОЗУ. Приемлемая точность для английского, базовая для русского.",
-            "small": "Сбалансированная, требует ~3 ГБ ОЗУ. Рекомендуется для приемлемого распознавания русской речи.",
-            "medium": "Медленная, требует ~6 ГБ ОЗУ. Отличная точность распознавания текста, но может подтормаживать на слабом ПК."
+            "small": "Сбалансированная, требует ~3 ГБ ОЗУ. Рекомендуется для базового распознавания.",
+            "medium": "Медленная на CPU, требует ~6 ГБ ОЗУ. Отличная точность текста.",
+            "large-v3-turbo": "Идеальный баланс феноменальной точности русского языка и высокой скорости (лучший выбор для GPU)."
         }
         self.local_model_hint.setText(hints.get(model_size, ""))
 
@@ -593,7 +603,50 @@ class MainWindow(QMainWindow):
     def on_model_load_error(self, error_msg):
         # We stop recording immediately since GPU failed and CPU fallback was disabled
         self.stop_recording()
-        QMessageBox.critical(self, "Ошибка инициализации GPU", f"Не удалось инициализировать видеокарту:\n\n{error_msg}\n\nПожалуйста, выберите 'CPU' или 'Auto' в настройках.")
+
+        if "Missing DLL: cublas64_12.dll" in error_msg or "Missing DLL: cudnn" in error_msg or "nvcuda.dll not found" in error_msg or "GPU initialization failed" in error_msg:
+            reply = QMessageBox.question(
+                self,
+                "Требуются компоненты CUDA",
+                "Для работы локального распознавания на видеокартах NVIDIA RTX требуются библиотеки CUDA.\n\nБудет скачан архив размером около 400-500 МБ.\n\nПродолжить?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+
+            if reply == QMessageBox.Yes:
+                self.start_cuda_download()
+            else:
+                QMessageBox.critical(self, "Ошибка инициализации GPU", f"Не удалось инициализировать видеокарту:\n\n{error_msg}\n\nПожалуйста, выберите 'CPU' или 'Auto' в настройках.")
+        else:
+            QMessageBox.critical(self, "Ошибка инициализации GPU", f"Не удалось инициализировать видеокарту:\n\n{error_msg}\n\nПожалуйста, выберите 'CPU' или 'Auto' в настройках.")
+
+    def start_cuda_download(self):
+        from PySide6.QtWidgets import QProgressDialog
+        from src.gui.workers import CUDADownloadWorker
+
+        self.progress_dialog = QProgressDialog("Подготовка к скачиванию...", "Отмена", 0, 100, self)
+        self.progress_dialog.setWindowTitle("Загрузка CUDA DLL")
+        self.progress_dialog.setWindowModality(Qt.WindowModal)
+        self.progress_dialog.setMinimumDuration(0)
+        self.progress_dialog.setValue(0)
+
+        self.cuda_worker = CUDADownloadWorker()
+        self.cuda_worker.progress.connect(self.progress_dialog.setValue)
+        self.cuda_worker.status_update.connect(self.progress_dialog.setLabelText)
+        self.cuda_worker.finished.connect(self.on_cuda_download_finished)
+
+        self.progress_dialog.canceled.connect(self.cuda_worker.terminate)
+
+        self.cuda_worker.start()
+
+    @Slot(bool, str)
+    def on_cuda_download_finished(self, success, message):
+        self.progress_dialog.close()
+
+        if success:
+            QMessageBox.information(self, "Установка завершена", message)
+        else:
+            QMessageBox.critical(self, "Ошибка установки", message)
 
     def stop_recording(self):
         self.btn_start.setEnabled(True)
