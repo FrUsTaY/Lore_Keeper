@@ -11,7 +11,8 @@ import os
 import sys
 
 # Динамическое подключение CUDA DLL
-dll_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cuBLAS and cuDNN")
+from src.utils.path_utils import get_path
+dll_path = get_path("cuBLAS and cuDNN")
 if os.path.exists(dll_path):
     os.environ["PATH"] = dll_path + os.pathsep + os.environ.get("PATH", "")
     if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
