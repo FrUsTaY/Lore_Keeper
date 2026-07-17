@@ -144,32 +144,25 @@ class LocalWhisperTranscriber:
             print(f"[Local Whisper Adapter] Starting initialization for model size '{self.model_size}' (device={self.device})...")
 
             try:
-                # Add DLL paths if we are on Windows and not forcing CPU
-                if os.name == 'nt' and self.device in ['auto', 'gpu']:
-                    site_packages = site.getsitepackages()
-                    site_packages.append(site.getusersitepackages())
-                    if hasattr(sys, 'real_prefix') or sys.prefix != sys.base_prefix:
-                        # Inside virtualenv or venv
-                        site_packages.insert(0, os.path.join(sys.prefix, 'Lib', 'site-packages'))
-
-                    for sp in site_packages:
-                        cublas_path = os.path.join(sp, 'nvidia', 'cublas', 'bin')
-                        cudnn_path = os.path.join(sp, 'nvidia', 'cudnn', 'bin')
-                        cuda_rt_path = os.path.join(sp, 'nvidia', 'cuda_runtime', 'bin')
-
-                        for p in [cublas_path, cudnn_path, cuda_rt_path]:
-                            if os.path.exists(p):
-                                try:
-                                    os.add_dll_directory(p)
-                                    print(f"[Local Whisper Adapter] Added DLL directory: {p}")
-                                except Exception as dll_err:
-                                    print(f"[Local Whisper Adapter] Failed to add DLL directory {p}: {dll_err}")
-
                 cuda_available = False
                 cuda_error_msg = ""
 
-                if self.device in ['auto', 'gpu']:
-                    # Try loading basic nvcuda.dll first
+                # Add DLL paths and preload them if we are on Windows and not forcing CPU
+                if os.name == 'nt' and self.device in ['auto', 'gpu']:
+                    from src.utils.path_utils import get_path
+                    dll_path = get_path("cuBLAS and cuDNN")
+
+                    if os.path.exists(dll_path):
+                        # Force it into PATH
+                        os.environ["PATH"] = dll_path + os.pathsep + os.environ.get("PATH", "")
+
+                        try:
+                            os.add_dll_directory(dll_path)
+                            print(f"[Local Whisper Adapter] Added DLL directory: {dll_path}")
+                        except Exception as dll_err:
+                            print(f"[Local Whisper Adapter] Failed to add DLL directory {dll_path}: {dll_err}")
+
+                    # Try loading basic nvcuda.dll first (driver level)
                     try:
                         ctypes.CDLL('nvcuda.dll')
                         print("[Local Whisper Adapter] NVIDIA CUDA detected (nvcuda.dll loaded).")
@@ -178,13 +171,21 @@ class LocalWhisperTranscriber:
                         cuda_error_msg = f"nvcuda.dll not found: {e}"
                         print(f"[Local Whisper Adapter] {cuda_error_msg}")
 
-                    if cuda_available and os.name == 'nt':
-                        # Check critical DLLs for faster-whisper (CTranslate2/cuDNN)
+                    if cuda_available:
+                        # Pre-load critical DLLs explicitly into process memory
+                        # to prevent ctranslate2 from crashing silently
                         test_dlls = ['cublas64_12.dll', 'cudnn_ops_infer64_8.dll']
                         for dll in test_dlls:
                             try:
-                                ctypes.WinDLL(dll)
-                                print(f"[Local Whisper Adapter] Successfully tested load of {dll}")
+                                # First, try loading by absolute path from our local folder
+                                full_dll_path = os.path.join(dll_path, dll)
+                                if os.path.exists(full_dll_path):
+                                    ctypes.CDLL(full_dll_path)
+                                    print(f"[Local Whisper Adapter] Explicitly loaded: {full_dll_path}")
+                                else:
+                                    # Fallback to system path resolution
+                                    ctypes.CDLL(dll)
+                                    print(f"[Local Whisper Adapter] Explicitly loaded from system: {dll}")
                             except OSError as e:
                                 cuda_available = False
                                 winerror = getattr(e, 'winerror', 'Unknown')
