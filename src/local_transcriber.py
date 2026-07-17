@@ -11,6 +11,7 @@ from src.utils.gpu_tester import _preload_cuda_dlls
 
 class LocalWhisperSignals(QObject):
     model_loaded = Signal(bool, str)
+    model_loading = Signal(str)
 
 class FasterWhisperEngine:
     def __init__(self, model_size):
@@ -49,6 +50,19 @@ class FasterWhisperEngine:
             language=lang
         )
         return " ".join([segment.text for segment in segments]).strip()
+
+    def unload(self):
+        import gc
+        print("[FasterWhisper] Unloading model and clearing GPU VRAM...")
+        self.model = None
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
+        print("[FasterWhisper] Model unloaded.")
 
 class WhisperCppEngine:
     def __init__(self, model_size):
@@ -128,6 +142,13 @@ class WhisperCppEngine:
 
         return " ".join(text_parts).strip()
 
+    def unload(self):
+        import gc
+        print("[Whisper.cpp] Unloading model from CPU RAM...")
+        self.model = None
+        gc.collect()
+        print("[Whisper.cpp] Model unloaded.")
+
 class LocalWhisperTranscriber:
     def __init__(self, model_size="base", device="auto"):
         self.model_size = model_size
@@ -136,6 +157,15 @@ class LocalWhisperTranscriber:
         self.is_loading = False
         self.is_ready = False
         self.signals = LocalWhisperSignals()
+
+    def unload_model(self):
+        print("[Local Whisper Adapter] Unloading model...")
+        if self.engine:
+            self.engine.unload()
+            self.engine = None
+        self.is_ready = False
+        self.is_loading = False
+        print("[Local Whisper Adapter] Model successfully unloaded.")
 
     def load_model_async(self):
         if self.is_loading or self.is_ready:
@@ -162,6 +192,7 @@ class LocalWhisperTranscriber:
                     raise RuntimeError(f"GPU initialization failed: {cuda_error_msg}. Fallback to CPU is disabled in settings.")
 
                 if cuda_available:
+                    self.signals.model_loading.emit("Инициализация и загрузка GPU модели (может занять время)...")
                     print("[Local Whisper Adapter] Spawning isolated subprocess to test GPU initialization safely...")
                     script_path = Path(__file__).parent / "utils" / "gpu_tester.py"
                     cmd_args = [sys.executable, str(script_path), str(self.model_size)]
@@ -214,9 +245,9 @@ class LocalWhisperTranscriber:
                     self.engine = WhisperCppEngine(self.model_size)
 
                     if self.device == 'auto' and cuda_error_msg:
-                        self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({cuda_error_msg}). Автоматически переключено на CPU. Начинается загрузка модели...")
+                        self.signals.model_loading.emit(f"[Whisper] Не удалось запустить GPU ({cuda_error_msg}). Автоматически переключено на CPU. Начинается загрузка модели...")
                     else:
-                        self.signals.model_loaded.emit(True, "Инициализация и загрузка CPU модели (может занять время)...")
+                        self.signals.model_loading.emit("Инициализация и загрузка CPU модели (может занять время)...")
 
                     self.engine.load()
                     self.is_ready = True

@@ -51,6 +51,13 @@ class AudioTranscriber:
                 logging.warning(f"Queue full when trying to stop: {e}")
             self.thread.join(timeout=2.0)
 
+        if self.local_transcriber:
+            try:
+                self.local_transcriber.unload_model()
+            except Exception as e:
+                logging.error(f"Failed to unload local transcriber model: {e}")
+            self.local_transcriber = None
+
     def add_audio(self, audio_data, sample_rate, timestamp):
         """Adds audio data to the queue to be transcribed."""
         # We save it to a temporary file first because Groq expects a file
@@ -72,6 +79,8 @@ class AudioTranscriber:
                 # Expose the signal so the CaptureWorker can catch it and forward to GUI
                 if hasattr(self, 'on_model_loaded_callback') and self.on_model_loaded_callback:
                     self.local_transcriber.signals.model_loaded.connect(self.on_model_loaded_callback)
+                if hasattr(self, 'on_model_loading_callback') and self.on_model_loading_callback:
+                    self.local_transcriber.signals.model_loading.connect(self.on_model_loading_callback)
 
                 # Pre-load model asynchronously
                 self.local_transcriber.load_model_async()
