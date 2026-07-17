@@ -21,8 +21,6 @@ if os.path.exists(dll_path):
         except Exception as e:
             print(f"Ошибка добавления DLL директории: {e}")
 
-from PySide6.QtWidgets import QApplication
-from src.gui.main_window import MainWindow
 from src.utils.path_utils import ensure_required_directories
 
 import multiprocessing
@@ -30,6 +28,9 @@ import multiprocessing
 def main():
     multiprocessing.freeze_support()
     ensure_required_directories()
+
+    from PySide6.QtWidgets import QApplication
+    from src.gui.main_window import MainWindow
 
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)

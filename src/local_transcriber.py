@@ -4,9 +4,10 @@ import threading
 import logging
 import sys
 import site
-import multiprocessing
+import subprocess
+from pathlib import Path
 from PySide6.QtCore import QObject, Signal
-from src.utils.gpu_tester import _preload_cuda_dlls, test_gpu_init
+from src.utils.gpu_tester import _preload_cuda_dlls
 
 class LocalWhisperSignals(QObject):
     model_loaded = Signal(bool, str)
@@ -161,37 +162,50 @@ class LocalWhisperTranscriber:
                     raise RuntimeError(f"GPU initialization failed: {cuda_error_msg}. Fallback to CPU is disabled in settings.")
 
                 if cuda_available:
-                    print("[Local Whisper Adapter] Spawning isolated process to test GPU initialization safely...")
-                    test_proc = multiprocessing.Process(target=test_gpu_init, args=(self.model_size,))
-                    test_proc.start()
-                    test_proc.join()
-
-                    if test_proc.exitcode == 0:
-                        print("[Local Whisper Adapter] Isolated test passed. Selecting FasterWhisperEngine (GPU mode) in main process.")
-                        self.engine = FasterWhisperEngine(self.model_size)
-                        try:
-                            self.engine.load()
-                            self.is_ready = True
-                            self.signals.model_loaded.emit(True, "Loaded on GPU")
-                            return
-                        except Exception as e:
-                            error_msg = f"FasterWhisperEngine failed during main process load: {e}"
+                    print("[Local Whisper Adapter] Spawning isolated subprocess to test GPU initialization safely...")
+                    script_path = Path(__file__).parent / "utils" / "gpu_tester.py"
+                    try:
+                        result = subprocess.run(
+                            [sys.executable, str(script_path), self.model_size],
+                            capture_output=True,
+                            text=True,
+                            timeout=15
+                        )
+                        if result.returncode == 0:
+                            print("[Local Whisper Adapter] Isolated test passed. Selecting FasterWhisperEngine (GPU mode) in main process.")
+                            self.engine = FasterWhisperEngine(self.model_size)
+                            try:
+                                self.engine.load()
+                                self.is_ready = True
+                                self.signals.model_loaded.emit(True, "Loaded on GPU")
+                                return
+                            except Exception as e:
+                                error_msg = f"FasterWhisperEngine failed during main process load: {e}"
+                                print(f"[Local Whisper Adapter] {error_msg}")
+                                if self.device == 'gpu':
+                                    raise RuntimeError(f"GPU initialization failed during model load: {e}. Fallback to CPU is disabled.")
+                                else:
+                                    print("[Local Whisper Adapter] Falling back to CPU Engine.")
+                                    cuda_available = False
+                                    self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({error_msg}). Автоматически переключено на CPU")
+                        else:
+                            error_msg = f"GPU process test failed (exit code {result.returncode}). Stderr: {result.stderr}"
                             print(f"[Local Whisper Adapter] {error_msg}")
                             if self.device == 'gpu':
-                                raise RuntimeError(f"GPU initialization failed during model load: {e}. Fallback to CPU is disabled.")
+                                raise RuntimeError(f"GPU initialization test failed: {error_msg}. Fallback to CPU is disabled.")
                             else:
                                 print("[Local Whisper Adapter] Falling back to CPU Engine.")
                                 cuda_available = False
-                                self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({error_msg}). Автоматически переключено на CPU")
-                    else:
-                        error_msg = f"GPU process test crashed (exit code {test_proc.exitcode}). Potential segfault or driver error."
+                                self.signals.model_loaded.emit(False, f"[Whisper] Запуск GPU привел к сбою ({result.returncode}). Автоматически переключено на CPU")
+                    except subprocess.TimeoutExpired:
+                        error_msg = "GPU process test timed out."
                         print(f"[Local Whisper Adapter] {error_msg}")
                         if self.device == 'gpu':
                             raise RuntimeError(f"GPU initialization test failed: {error_msg}. Fallback to CPU is disabled.")
                         else:
                             print("[Local Whisper Adapter] Falling back to CPU Engine.")
                             cuda_available = False
-                            self.signals.model_loaded.emit(False, f"[Whisper] Запуск GPU привел к сбою ({error_msg}). Автоматически переключено на CPU")
+                            self.signals.model_loaded.emit(False, f"[Whisper] Запуск GPU привел к сбою (Timeout). Автоматически переключено на CPU")
 
                 if not cuda_available or self.device == 'cpu':
                     print("[Local Whisper Adapter] Selecting WhisperCppEngine (CPU mode).")

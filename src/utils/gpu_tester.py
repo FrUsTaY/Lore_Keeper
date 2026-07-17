@@ -87,3 +87,11 @@ def test_gpu_init(model_size):
     except Exception as e:
         print(f"[Isolated GPU Test] Exception during load: {e}")
         sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python gpu_tester.py <model_size>")
+        sys.exit(1)
+
+    model_size = sys.argv[1]
+    test_gpu_init(model_size)
