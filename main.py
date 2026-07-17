@@ -29,6 +29,15 @@ def main():
     multiprocessing.freeze_support()
     ensure_required_directories()
 
+    # CRITICAL: Prevent MSVCP140.dll version conflict between shiboken6 (PySide6) and cuDNN
+    if sys.platform == "win32":
+        import ctypes
+        try:
+            ctypes.CDLL(r"C:\Windows\System32\vcruntime140_1.dll")
+            ctypes.CDLL(r"C:\Windows\System32\msvcp140.dll")
+        except OSError as e:
+            print(f"Warning: could not preload system MSVCP140.dll: {e}")
+
     from PySide6.QtWidgets import QApplication
     from src.gui.main_window import MainWindow
 
