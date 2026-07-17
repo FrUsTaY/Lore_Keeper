@@ -21,8 +21,6 @@ if os.path.exists(dll_path):
         except Exception as e:
             print(f"Ошибка добавления DLL директории: {e}")
 
-from PySide6.QtWidgets import QApplication
-from src.gui.main_window import MainWindow
 from src.utils.path_utils import ensure_required_directories
 
 import multiprocessing
@@ -30,6 +28,25 @@ import multiprocessing
 def main():
     multiprocessing.freeze_support()
     ensure_required_directories()
+
+    # CRITICAL: Prevent MSVCP140.dll version conflict between shiboken6 (PySide6) and cuDNN.
+    # PySide6 (shiboken6) bundles its own MSVCP140.dll. If Windows loads it first, cuDNN/ctranslate2
+    # will attempt to use it, causing an ABI mismatch and an Access Violation (0xc0000005) crash during
+    # GPU initialization. Preloading the system C++ runtime DLLs from System32 forces both to share
+    # the correct system-wide version. Do NOT remove this block.
+    if sys.platform == "win32":
+        import ctypes
+        import logging
+        try:
+            ctypes.CDLL(r"C:\Windows\System32\vcruntime140_1.dll")
+            ctypes.CDLL(r"C:\Windows\System32\msvcp140.dll")
+        except OSError as e:
+            error_msg = f"Warning: could not preload system MSVCP140.dll: {e}. GPU initialization may crash if Visual C++ Redistributable is missing or outdated."
+            print(error_msg)
+            logging.warning(error_msg)
+
+    from PySide6.QtWidgets import QApplication
+    from src.gui.main_window import MainWindow
 
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)

@@ -1,6 +1,12 @@
 import os
 import sys
 import ctypes
+from pathlib import Path
+
+# Add project root to sys.path so 'src.utils...' imports work when run as standalone subprocess
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 def _clean_nvidia_paths():
     """Removes any paths containing 'nvidia' from sys.path and os.environ['PATH']."""
@@ -87,3 +93,11 @@ def test_gpu_init(model_size):
     except Exception as e:
         print(f"[Isolated GPU Test] Exception during load: {e}")
         sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python gpu_tester.py <model_size>")
+        sys.exit(1)
+
+    model_size = sys.argv[1]
+    test_gpu_init(model_size)
