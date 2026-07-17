@@ -32,8 +32,11 @@ class CUDADownloadWorker(QThread):
             for url in urls:
                 self.status_update.emit(f"Подключение к серверу...")
                 try:
-                    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-                    response = requests.get(url, stream=True, timeout=10, headers=headers)
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                        'Accept': 'application/octet-stream'
+                    }
+                    response = requests.get(url, stream=True, timeout=10, headers=headers, allow_redirects=True)
                     response.raise_for_status()
 
                     total_size = int(response.headers.get('content-length', 0))
