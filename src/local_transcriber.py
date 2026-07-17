@@ -4,7 +4,9 @@ import threading
 import logging
 import sys
 import site
+import multiprocessing
 from PySide6.QtCore import QObject, Signal
+from src.utils.gpu_tester import _preload_cuda_dlls, test_gpu_init
 
 class LocalWhisperSignals(QObject):
     model_loaded = Signal(bool, str)
@@ -149,70 +151,47 @@ class LocalWhisperTranscriber:
 
                 # Add DLL paths and preload them if we are on Windows and not forcing CPU
                 if os.name == 'nt' and self.device in ['auto', 'gpu']:
-                    from src.utils.path_utils import get_path
-                    dll_path = get_path("cuBLAS and cuDNN")
-
-                    if os.path.exists(dll_path):
-                        # Force it into PATH
-                        os.environ["PATH"] = dll_path + os.pathsep + os.environ.get("PATH", "")
-
-                        try:
-                            os.add_dll_directory(dll_path)
-                            print(f"[Local Whisper Adapter] Added DLL directory: {dll_path}")
-                        except Exception as dll_err:
-                            print(f"[Local Whisper Adapter] Failed to add DLL directory {dll_path}: {dll_err}")
-
-                    # Try loading basic nvcuda.dll first (driver level)
-                    try:
-                        ctypes.CDLL('nvcuda.dll')
-                        print("[Local Whisper Adapter] NVIDIA CUDA detected (nvcuda.dll loaded).")
-                        cuda_available = True
-                    except Exception as e:
-                        cuda_error_msg = f"nvcuda.dll not found: {e}"
-                        print(f"[Local Whisper Adapter] {cuda_error_msg}")
-
+                    cuda_available, cuda_error_msg = _preload_cuda_dlls()
                     if cuda_available:
-                        # Pre-load critical DLLs explicitly into process memory
-                        # to prevent ctranslate2 from crashing silently
-                        test_dlls = ['cublas64_12.dll', 'cudnn_ops_infer64_8.dll']
-                        for dll in test_dlls:
-                            try:
-                                # First, try loading by absolute path from our local folder
-                                full_dll_path = os.path.join(dll_path, dll)
-                                if os.path.exists(full_dll_path):
-                                    ctypes.CDLL(full_dll_path)
-                                    print(f"[Local Whisper Adapter] Explicitly loaded: {full_dll_path}")
-                                else:
-                                    # Fallback to system path resolution
-                                    ctypes.CDLL(dll)
-                                    print(f"[Local Whisper Adapter] Explicitly loaded from system: {dll}")
-                            except OSError as e:
-                                cuda_available = False
-                                winerror = getattr(e, 'winerror', 'Unknown')
-                                cuda_error_msg = f"Missing DLL: {dll} (WinError {winerror})"
-                                print(f"[Local Whisper Adapter] {cuda_error_msg}")
-                                break
+                        print("[Local Whisper Adapter] Successfully pre-loaded all CUDA DLLs.")
+                    else:
+                        print(f"[Local Whisper Adapter] Failed to pre-load CUDA DLLs: {cuda_error_msg}")
 
                 if self.device == 'gpu' and not cuda_available:
                     raise RuntimeError(f"GPU initialization failed: {cuda_error_msg}. Fallback to CPU is disabled in settings.")
 
                 if cuda_available:
-                    print("[Local Whisper Adapter] Selecting FasterWhisperEngine (GPU mode).")
-                    self.engine = FasterWhisperEngine(self.model_size)
-                    try:
-                        self.engine.load()
-                        self.is_ready = True
-                        self.signals.model_loaded.emit(True, "Loaded on GPU")
-                        return
-                    except Exception as e:
-                        error_msg = f"FasterWhisperEngine failed: {e}"
+                    print("[Local Whisper Adapter] Spawning isolated process to test GPU initialization safely...")
+                    test_proc = multiprocessing.Process(target=test_gpu_init, args=(self.model_size,))
+                    test_proc.start()
+                    test_proc.join()
+
+                    if test_proc.exitcode == 0:
+                        print("[Local Whisper Adapter] Isolated test passed. Selecting FasterWhisperEngine (GPU mode) in main process.")
+                        self.engine = FasterWhisperEngine(self.model_size)
+                        try:
+                            self.engine.load()
+                            self.is_ready = True
+                            self.signals.model_loaded.emit(True, "Loaded on GPU")
+                            return
+                        except Exception as e:
+                            error_msg = f"FasterWhisperEngine failed during main process load: {e}"
+                            print(f"[Local Whisper Adapter] {error_msg}")
+                            if self.device == 'gpu':
+                                raise RuntimeError(f"GPU initialization failed during model load: {e}. Fallback to CPU is disabled.")
+                            else:
+                                print("[Local Whisper Adapter] Falling back to CPU Engine.")
+                                cuda_available = False
+                                self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({error_msg}). Автоматически переключено на CPU")
+                    else:
+                        error_msg = f"GPU process test crashed (exit code {test_proc.exitcode}). Potential segfault or driver error."
                         print(f"[Local Whisper Adapter] {error_msg}")
                         if self.device == 'gpu':
-                            raise RuntimeError(f"GPU initialization failed during model load: {e}. Fallback to CPU is disabled.")
+                            raise RuntimeError(f"GPU initialization test failed: {error_msg}. Fallback to CPU is disabled.")
                         else:
                             print("[Local Whisper Adapter] Falling back to CPU Engine.")
                             cuda_available = False
-                            self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({error_msg}). Автоматически переключено на CPU")
+                            self.signals.model_loaded.emit(False, f"[Whisper] Запуск GPU привел к сбою ({error_msg}). Автоматически переключено на CPU")
 
                 if not cuda_available or self.device == 'cpu':
                     print("[Local Whisper Adapter] Selecting WhisperCppEngine (CPU mode).")
