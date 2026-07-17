@@ -164,9 +164,11 @@ class LocalWhisperTranscriber:
                 if cuda_available:
                     print("[Local Whisper Adapter] Spawning isolated subprocess to test GPU initialization safely...")
                     script_path = Path(__file__).parent / "utils" / "gpu_tester.py"
+                    cmd_args = [sys.executable, str(script_path), str(self.model_size)]
+                    print(f"[Local Whisper Adapter] Debug subprocess cmd: {cmd_args}")
                     try:
                         result = subprocess.run(
-                            [sys.executable, str(script_path), self.model_size],
+                            cmd_args,
                             capture_output=True,
                             text=True,
                             timeout=15
@@ -189,7 +191,7 @@ class LocalWhisperTranscriber:
                                     cuda_available = False
                                     self.signals.model_loaded.emit(False, f"[Whisper] Не удалось запустить GPU ({error_msg}). Автоматически переключено на CPU")
                         else:
-                            error_msg = f"GPU process test failed (exit code {result.returncode}). Stderr: {result.stderr}"
+                            error_msg = f"GPU process test failed (exit code {result.returncode}). Stdout: {result.stdout} Stderr: {result.stderr}"
                             print(f"[Local Whisper Adapter] {error_msg}")
                             if self.device == 'gpu':
                                 raise RuntimeError(f"GPU initialization test failed: {error_msg}. Fallback to CPU is disabled.")
