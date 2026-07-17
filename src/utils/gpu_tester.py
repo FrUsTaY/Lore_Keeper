@@ -1,6 +1,12 @@
 import os
 import sys
 import ctypes
+from pathlib import Path
+
+# Add project root to sys.path so 'src.utils...' imports work when run as standalone subprocess
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 def _clean_nvidia_paths():
     """Removes any paths containing 'nvidia' from sys.path and os.environ['PATH']."""
