@@ -18,7 +18,7 @@ class CUDADownloadWorker(QThread):
 
         # Fallback URLs
         urls = [
-            "https://github.com/FrUsTaY/Lore_Keeper/releases/download/cuBLAS.and.cuDNN_CUDA12_win_v1/cuBLAS.and.cuDNN_CUDA12_win_v1.zip"
+            "https://github.com/FrUsTaY/public-releases/releases/download/cuBLAS.and.cuDNN_CUDA12_win_v1/cuBLAS.and.cuDNN_CUDA12_win_v1.zip"
         ]
 
         # Target directory in root
