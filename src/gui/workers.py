@@ -12,14 +12,13 @@ class CUDADownloadWorker(QThread):
 
     def run(self):
         import requests
-        import py7zr
+        import zipfile
         import tempfile
         import shutil
 
         # Fallback URLs
         urls = [
-            "https://github.com/FrUsTaY/Lore_Keeper/releases/download/v0.0.0-assets/cuBLAS.and.cuDNN_CUDA12_win_v1.7z",
-            "https://github.com/Purfview/whisper-standalone-win/releases/download/libs/cuBLAS.and.cuDNN_CUDA12_win_v1.7z"
+            "https://github.com/FrUsTaY/public-releases/releases/download/cuBLAS.and.cuDNN_CUDA12_win_v1/cuBLAS.and.cuDNN_CUDA12_win_v1.zip"
         ]
 
         # Target directory in root
@@ -33,12 +32,16 @@ class CUDADownloadWorker(QThread):
             for url in urls:
                 self.status_update.emit(f"Подключение к серверу...")
                 try:
-                    response = requests.get(url, stream=True, timeout=10)
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                        'Accept': 'application/octet-stream'
+                    }
+                    response = requests.get(url, stream=True, timeout=10, headers=headers, allow_redirects=True)
                     response.raise_for_status()
 
                     total_size = int(response.headers.get('content-length', 0))
 
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".7z") as temp_file:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
                         archive_path = temp_file.name
                         downloaded = 0
 
@@ -71,7 +74,7 @@ class CUDADownloadWorker(QThread):
                 shutil.rmtree(target_dir)
             os.makedirs(target_dir, exist_ok=True)
 
-            with py7zr.SevenZipFile(archive_path, mode='r') as z:
+            with zipfile.ZipFile(archive_path, 'r') as z:
                 z.extractall(path=target_dir)
 
             self.progress.emit(100)

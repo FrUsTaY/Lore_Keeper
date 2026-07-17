@@ -632,7 +632,7 @@ class MainWindow(QMainWindow):
             reply = QMessageBox.question(
                 self,
                 "Требуются компоненты CUDA",
-                "Для работы локального распознавания на видеокартах NVIDIA RTX требуются библиотеки CUDA.\n\nБудет скачан архив размером около 400-500 МБ.\n\nПродолжить?",
+                "Для работы локального распознавания на видеокартах NVIDIA RTX требуются библиотеки CUDA.\n\nБудет скачан архив размером около 800 МБ.\n\nПродолжить?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.Yes
             )
