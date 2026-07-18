@@ -12,18 +12,24 @@ from src.utils.gpu_tester import _preload_cuda_dlls
 class LocalWhisperSignals(QObject):
     model_loaded = Signal(bool, str)
     model_loading = Signal(str)
+    download_requested = Signal(str, str) # title, message
 
 class FasterWhisperEngine:
-    def __init__(self, model_size):
+    def __init__(self, model_size, custom_model_path=None):
         self.model_size = model_size
+        self.custom_model_path = custom_model_path
         self.model = None
 
     def load(self):
         from faster_whisper import WhisperModel, download_model
 
-        print(f"[FasterWhisper] Resolving absolute path for model '{self.model_size}'...")
-        model_path = download_model(self.model_size, local_files_only=False)
-        print(f"[FasterWhisper] Resolved model path: {model_path}")
+        if self.custom_model_path and os.path.exists(self.custom_model_path) and len(os.listdir(self.custom_model_path)) > 0:
+            print(f"[FasterWhisper] Using custom model path: {self.custom_model_path}")
+            model_path = self.custom_model_path
+        else:
+            print(f"[FasterWhisper] Resolving absolute path for model '{self.model_size}' from HF cache...")
+            model_path = download_model(self.model_size, local_files_only=True)
+            print(f"[FasterWhisper] Resolved model path: {model_path}")
 
         print(f"[FasterWhisper] Attempting to load model on CUDA (float16)...")
         self.model = WhisperModel(
@@ -65,8 +71,9 @@ class FasterWhisperEngine:
         print("[FasterWhisper] Model unloaded.")
 
 class WhisperCppEngine:
-    def __init__(self, model_size):
+    def __init__(self, model_size, custom_model_path=None):
         self.model_size = model_size
+        self.custom_model_path = custom_model_path
         self.model = None
 
     def load(self):
@@ -74,11 +81,14 @@ class WhisperCppEngine:
         from pywhispercpp.model import Model
 
         filename = f"ggml-{self.model_size}.bin"
-        print(f"[Whisper.cpp] Downloading/Resolving GGML model '{filename}' from ggerganov/whisper.cpp...")
 
-        # Download the GGML model (or get path if cached)
-        model_path = hf_hub_download(repo_id="ggerganov/whisper.cpp", filename=filename)
-        print(f"[Whisper.cpp] Resolved model path: {model_path}")
+        if self.custom_model_path and os.path.exists(self.custom_model_path) and len(os.listdir(self.custom_model_path)) > 0:
+            print(f"[Whisper.cpp] Using custom model path: {self.custom_model_path}")
+            model_path = os.path.join(self.custom_model_path, filename)
+        else:
+            print(f"[Whisper.cpp] Resolving GGML model '{filename}' from ggerganov/whisper.cpp cache...")
+            model_path = hf_hub_download(repo_id="ggerganov/whisper.cpp", filename=filename, local_files_only=True)
+            print(f"[Whisper.cpp] Resolved model path: {model_path}")
 
         print(f"[Whisper.cpp] Attempting to load model on CPU...")
 
@@ -157,6 +167,128 @@ class LocalWhisperTranscriber:
         self.is_loading = False
         self.is_ready = False
         self.signals = LocalWhisperSignals()
+        self.download_event = threading.Event()
+        self.download_response = False
+
+    def _check_and_download_model(self, engine_type):
+        from huggingface_hub import hf_hub_download, HfFileSystem
+        import requests
+
+        # Approximate sizes in MB
+        sizes_mb = {
+            "gpu": {
+                "small": 480,
+                "medium": 1500,
+                "large-v3-turbo": 1600
+            },
+            "cpu": {
+                "small": 500,
+                "medium": 1550,
+                "large-v3-turbo": 1650
+            }
+        }
+
+        repo_id = f"Systran/faster-whisper-{self.model_size}" if engine_type == "gpu" else "ggerganov/whisper.cpp"
+        size_mb = sizes_mb.get(engine_type, {}).get(self.model_size, 1500)
+
+        print(f"[Local Whisper Adapter] Checking if {engine_type} model {self.model_size} exists in cache...")
+        fs = HfFileSystem()
+
+        files_to_download = []
+        if engine_type == "gpu":
+            try:
+                # Get files in repo
+                repo_files = fs.ls(repo_id, detail=False)
+                for f in repo_files:
+                    filename = f.split("/")[-1]
+                    # We just need the main files, skip .gitattributes and README.md
+                    if filename in [".gitattributes", "README.md"]:
+                        continue
+
+                    try:
+                        # try to get from cache
+                        hf_hub_download(repo_id=repo_id, filename=filename, local_files_only=True)
+                    except Exception:
+                        # file not in cache
+                        files_to_download.append(filename)
+            except Exception as e:
+                print(f"[Local Whisper Adapter] Could not list repo: {e}. Will attempt standard download.")
+                # We can't check easily, just let it proceed to standard faster-whisper logic which might block
+                pass
+        else:
+            filename = f"ggml-{self.model_size}.bin"
+            try:
+                hf_hub_download(repo_id=repo_id, filename=filename, local_files_only=True)
+            except Exception:
+                files_to_download.append(filename)
+
+        if not files_to_download:
+            print("[Local Whisper Adapter] Model already fully cached.")
+            return True
+
+        print(f"[Local Whisper Adapter] Model not found in cache. Requesting permission to download ~{size_mb} MB.")
+
+        self.download_event.clear()
+        self.download_response = False
+
+        self.signals.download_requested.emit(
+            "Скачивание модели",
+            f"Модель не найдена и будет скачана (~{size_mb} МБ). Продолжить?"
+        )
+
+        # Wait for user response (5 minutes timeout)
+        self.download_event.wait(timeout=300)
+
+        if not self.download_response:
+            return False
+
+        self.signals.model_loading.emit("Скачивание модели... (может занять время)")
+
+        # Now perform the actual download showing progress
+        try:
+            total_size = sum([fs.info(f"{repo_id}/{f}")["size"] for f in files_to_download])
+        except Exception:
+            total_size = size_mb * 1024 * 1024
+
+        downloaded_bytes = 0
+
+        from src.utils.path_utils import get_path
+        import os
+
+        model_dir = get_path(f"models/{repo_id.replace('/', '_')}")
+        os.makedirs(model_dir, exist_ok=True)
+
+        for filename in files_to_download:
+            url = f"https://huggingface.co/{repo_id}/resolve/main/{filename}"
+            filepath = os.path.join(model_dir, filename)
+
+            # Skip if already downloaded fully (naive check by existence)
+            if os.path.exists(filepath):
+                # get size
+                local_size = os.path.getsize(filepath)
+                # We could check if size matches, but for now just assume it's fine
+                downloaded_bytes += local_size
+                continue
+
+            response = requests.get(url, stream=True, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+            response.raise_for_status()
+
+            file_size = int(response.headers.get('content-length', 0))
+
+            with open(filepath, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded_bytes += len(chunk)
+                        if total_size > 0:
+                            percent = int((downloaded_bytes / total_size) * 100)
+                            mb_downloaded = downloaded_bytes / (1024 * 1024)
+                            mb_total = total_size / (1024 * 1024)
+                            self.signals.model_loading.emit(f"Скачивание: {mb_downloaded:.1f} МБ / {mb_total:.1f} МБ ({percent}%)")
+
+        print("[Local Whisper Adapter] Custom download complete.")
+        self.custom_model_path = model_dir
+        return True
 
     def unload_model(self):
         print("[Local Whisper Adapter] Unloading model...")
@@ -178,11 +310,13 @@ class LocalWhisperTranscriber:
 
             # Step 1: Pre-download model to cache before any GPU tests to avoid 15s timeouts
             try:
-                self.signals.model_loading.emit("Скачивание модели... (может занять время)")
-                print(f"[Local Whisper Adapter] Pre-downloading model '{self.model_size}' to cache...")
-                from faster_whisper import download_model
-                download_model(self.model_size, local_files_only=False)
-                print("[Local Whisper Adapter] Model download/resolution complete.")
+                engine_type = "gpu" if self.device in ['auto', 'gpu'] else "cpu"
+                if not self._check_and_download_model(engine_type):
+                    print("[Local Whisper Adapter] Model download cancelled by user.")
+                    self.is_ready = False
+                    self.signals.model_loaded.emit(False, "Загрузка модели отменена пользователем.")
+                    self.is_loading = False
+                    return
             except Exception as e:
                 print(f"[Local Whisper Adapter] Error downloading model: {e}")
                 self.is_ready = False
@@ -212,6 +346,8 @@ class LocalWhisperTranscriber:
                     print("[Local Whisper Adapter] Spawning isolated subprocess to test GPU initialization safely...")
                     script_path = Path(__file__).parent / "utils" / "gpu_tester.py"
                     cmd_args = [sys.executable, str(script_path), str(self.model_size)]
+                    if hasattr(self, 'custom_model_path') and self.custom_model_path:
+                        cmd_args.append(self.custom_model_path)
                     print(f"[Local Whisper Adapter] Debug subprocess cmd: {cmd_args}")
                     try:
                         result = subprocess.run(
@@ -222,7 +358,7 @@ class LocalWhisperTranscriber:
                         )
                         if result.returncode == 0:
                             print("[Local Whisper Adapter] Isolated test passed. Selecting FasterWhisperEngine (GPU mode) in main process.")
-                            self.engine = FasterWhisperEngine(self.model_size)
+                            self.engine = FasterWhisperEngine(self.model_size, getattr(self, 'custom_model_path', None))
                             try:
                                 self.engine.load()
                                 self.is_ready = True
@@ -258,7 +394,7 @@ class LocalWhisperTranscriber:
 
                 if not cuda_available or self.device == 'cpu':
                     print("[Local Whisper Adapter] Selecting WhisperCppEngine (CPU mode).")
-                    self.engine = WhisperCppEngine(self.model_size)
+                    self.engine = WhisperCppEngine(self.model_size, getattr(self, 'custom_model_path', None))
 
                     if self.device == 'auto' and cuda_error_msg:
                         self.signals.model_loading.emit(f"[Whisper] Не удалось запустить GPU ({cuda_error_msg}). Автоматически переключено на CPU. Начинается загрузка модели...")

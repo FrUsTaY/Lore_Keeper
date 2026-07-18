@@ -81,6 +81,8 @@ class AudioTranscriber:
                     self.local_transcriber.signals.model_loaded.connect(self.on_model_loaded_callback)
                 if hasattr(self, 'on_model_loading_callback') and self.on_model_loading_callback:
                     self.local_transcriber.signals.model_loading.connect(self.on_model_loading_callback)
+                if hasattr(self, 'on_download_requested_callback') and self.on_download_requested_callback:
+                    self.local_transcriber.signals.download_requested.connect(self.on_download_requested_callback)
 
                 # Pre-load model asynchronously
                 self.local_transcriber.load_model_async()

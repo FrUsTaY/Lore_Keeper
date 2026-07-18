@@ -616,6 +616,7 @@ class MainWindow(QMainWindow):
             self.capture_worker.status_changed.connect(self.status_bar.showMessage)
             self.capture_worker.model_load_error.connect(self.on_model_load_error)
             self.capture_worker.transcription_error.connect(self.on_transcription_error)
+            self.capture_worker.download_requested.connect(self.on_download_requested)
             self.capture_worker.start()
         except Exception as e:
             self.btn_start.setEnabled(True)
@@ -689,6 +690,18 @@ class MainWindow(QMainWindow):
     def on_new_event(self, timestamp, text):
         time_str = timestamp.split("T")[-1][:8]
         self.text_live_log.append(f"[{time_str}] {text}")
+
+    @Slot(str, str)
+    def on_download_requested(self, title, message):
+        reply = QMessageBox.question(
+            self,
+            title,
+            message,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if self.capture_worker:
+            self.capture_worker.set_download_response(reply == QMessageBox.Yes)
 
     @Slot(str)
     def on_transcription_error(self, error_msg):
