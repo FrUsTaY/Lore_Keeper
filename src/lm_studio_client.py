@@ -28,8 +28,7 @@ class LMStudioClient:
         payload = {
             "model": self.config.get("model", "local-model"),
             "messages": messages,
-            "temperature": self.config.get("temperature", 1.0),
-            "max_tokens": self.config.get("max_output_tokens", 4096)
+            "temperature": self.config.get("temperature", 1.0)
         }
 
         try:
