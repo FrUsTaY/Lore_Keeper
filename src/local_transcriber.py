@@ -370,17 +370,25 @@ class LocalWhisperTranscriber:
                 if cuda_available:
                     self.signals.model_loading.emit("Инициализация и загрузка GPU модели (может занять время)...")
                     print("[Local Whisper Adapter] Spawning isolated subprocess to test GPU initialization safely...")
-                    script_path = Path(__file__).parent / "utils" / "gpu_tester.py"
-                    cmd_args = [sys.executable, str(script_path), str(self.model_size)]
+                    if getattr(sys, 'frozen', False):
+                        tester_path = os.path.join(os.path.dirname(sys.executable), "gpu_tester.exe")
+                        cmd_args = [tester_path, str(self.model_size)]
+                    else:
+                        script_path = Path(__file__).parent / "utils" / "gpu_tester.py"
+                        cmd_args = [sys.executable, str(script_path), str(self.model_size)]
+
                     if hasattr(self, 'custom_model_path') and self.custom_model_path:
                         cmd_args.append(self.custom_model_path)
+
                     print(f"[Local Whisper Adapter] Debug subprocess cmd: {cmd_args}")
                     try:
+                        creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) if os.name == 'nt' else 0
                         result = subprocess.run(
                             cmd_args,
                             capture_output=True,
                             text=True,
-                            timeout=15
+                            timeout=15,
+                            creationflags=creationflags
                         )
                         if result.returncode == 0:
                             print("[Local Whisper Adapter] Isolated test passed. Selecting FasterWhisperEngine (GPU mode) in main process.")
