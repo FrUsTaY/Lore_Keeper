@@ -20,7 +20,6 @@ class ConfigManager:
                 "models_url": "http://localhost:1234/v1/models",
                 "model": "qwen2.5-1.5b-instruct",
                 "temperature": 1.0,
-                "max_output_tokens": 4096,
                 "max_context_tokens": 1500,
                 "timeout": 120,
                 "genre": "fantasy",

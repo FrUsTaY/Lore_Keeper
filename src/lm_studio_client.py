@@ -29,7 +29,7 @@ class LMStudioClient:
             "model": self.config.get("model", "local-model"),
             "messages": messages,
             "temperature": self.config.get("temperature", 1.0),
-            "max_tokens": self.config.get("max_output_tokens", 4096)
+            "max_tokens": -1  # -1 instructs LM Studio/local OpenAI endpoints to generate up to the model's absolute limit
         }
 
         try:

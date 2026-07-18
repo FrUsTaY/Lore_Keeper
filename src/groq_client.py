@@ -59,7 +59,7 @@ class GroqClient:
             "model": model,
             "messages": formatted_messages,
             "temperature": self.config.get("temperature", 1.0),
-            "max_tokens": self.config.get("max_output_tokens", 4096)
+            "max_tokens": 8192  # Explicit high limit for Groq (cloud APIs typically reject -1)
         }
 
         delay = 2
