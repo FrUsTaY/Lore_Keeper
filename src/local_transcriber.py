@@ -175,6 +175,21 @@ class LocalWhisperTranscriber:
 
         def load_task():
             print(f"[Local Whisper Adapter] Starting initialization for model size '{self.model_size}' (device={self.device})...")
+
+            # Step 1: Pre-download model to cache before any GPU tests to avoid 15s timeouts
+            try:
+                self.signals.model_loading.emit("Скачивание модели... (может занять время)")
+                print(f"[Local Whisper Adapter] Pre-downloading model '{self.model_size}' to cache...")
+                from faster_whisper import download_model
+                download_model(self.model_size, local_files_only=False)
+                print("[Local Whisper Adapter] Model download/resolution complete.")
+            except Exception as e:
+                print(f"[Local Whisper Adapter] Error downloading model: {e}")
+                self.is_ready = False
+                self.signals.model_loaded.emit(False, f"Ошибка скачивания модели: {e}")
+                self.is_loading = False
+                return
+
             self.signals.model_loading.emit("Инициализация локальной модели (ожидание)...")
 
             try:
