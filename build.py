@@ -70,7 +70,11 @@ def build():
         "--hidden-import", "huggingface_hub",
         "--hidden-import", "pywhispercpp",
         "--hidden-import", "shiboken6",
+        "--hidden-import", "torch",
+        "--hidden-import", "torchaudio",
+        "--hidden-import", "omegaconf",
         "--collect-all", "PySide6",
+        "--collect-all", "torch",
         "--collect-binaries", "soundfile",
         "--name", "LoreKeeper",
         "main.py"

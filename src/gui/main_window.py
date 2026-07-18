@@ -8,13 +8,40 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Slot, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QStyle
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PySide6.QtCore import QUrl
 import os
 import threading
 import time
 import keyboard
 
-from src.gui.workers import CaptureWorker, GenerationWorker
+from src.gui.workers import CaptureWorker, GenerationWorker, TTSWorker
 from src.session_manager import SessionManager
+
+class StoryItemWidget(QWidget):
+    play_clicked = Signal(str, QPushButton) # filepath, button reference
+
+    def __init__(self, filename, filepath, parent=None):
+        super().__init__(parent)
+        self.filename = filename
+        self.filepath = filepath
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(5, 2, 5, 2)
+
+        self.label = QLabel(filename)
+        self.btn_play = QPushButton()
+        self.btn_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+        self.btn_play.setToolTip("Озвучить (Play/Stop)")
+        self.btn_play.setFixedSize(24, 24)
+
+        self.layout.addWidget(self.label)
+        self.layout.addStretch()
+        self.layout.addWidget(self.btn_play)
+
+        self.btn_play.clicked.connect(self._on_play)
+
+    def _on_play(self):
+        self.play_clicked.emit(self.filepath, self.btn_play)
 from src.config_manager import ConfigManager
 from src.utils.path_utils import get_path
 
@@ -393,6 +420,14 @@ class MainWindow(QMainWindow):
         self.session_manager = SessionManager()
         self.capture_worker = None
         self.generation_worker = None
+        self.tts_worker = None
+
+        self.audio_player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.audio_player.setAudioOutput(self.audio_output)
+        self.audio_output.setVolume(1.0)
+        self.current_playing_btn = None
+        self.audio_player.mediaStatusChanged.connect(self.on_media_status_changed)
 
         self.hotkey_hook = None
         self.hotkey_triggered.connect(self.toggle_recording)
@@ -608,15 +643,126 @@ class MainWindow(QMainWindow):
         os.makedirs(stories_dir, exist_ok=True)
         for f in os.listdir(stories_dir):
             if f.endswith(".md"):
-                self.list_stories.addItem(f)
+                item = QListWidgetItem(self.list_stories)
+                filepath = os.path.join(stories_dir, f)
+
+                widget = StoryItemWidget(f, filepath)
+                widget.play_clicked.connect(self.toggle_story_audio)
+
+                item.setSizeHint(widget.sizeHint())
+                item.setData(Qt.UserRole, f)
+
+                self.list_stories.addItem(item)
+                self.list_stories.setItemWidget(item, widget)
 
     def load_story_text(self, item):
-        filepath = os.path.join(get_path("outputs/stories"), item.text())
+        filename = item.data(Qt.UserRole)
+        filepath = os.path.join(get_path("outputs/stories"), filename)
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 self.text_story_view.setText(f.read())
         except Exception as e:
             self.text_story_view.setText(f"Ошибка загрузки: {e}")
+
+    def on_media_status_changed(self, status):
+        if status == QMediaPlayer.EndOfMedia:
+            if self.current_playing_btn:
+                try:
+                    self.current_playing_btn.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+                except RuntimeError:
+                    pass # Button might have been deleted
+                self.current_playing_btn = None
+
+    def toggle_story_audio(self, filepath, btn_reference):
+        # Stop current if playing
+        if self.audio_player.playbackState() == QMediaPlayer.PlayingState:
+            self.audio_player.stop()
+            if self.current_playing_btn:
+                self.current_playing_btn.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+            # If they clicked the same button that was playing, just stop and return
+            if self.current_playing_btn == btn_reference:
+                self.current_playing_btn = None
+                return
+
+        wav_filepath = filepath.rsplit('.', 1)[0] + ".wav"
+
+        if os.path.exists(wav_filepath):
+            self.play_audio(wav_filepath, btn_reference)
+        else:
+            self.generate_and_play_audio(filepath, btn_reference)
+
+    def play_audio(self, wav_filepath, btn_reference):
+        self.audio_player.setSource(QUrl.fromLocalFile(wav_filepath))
+        self.audio_player.play()
+        self.current_playing_btn = btn_reference
+        self.current_playing_btn.setIcon(self.style().standardIcon(QStyle.SP_MediaStop))
+
+    def generate_and_play_audio(self, md_filepath, btn_reference):
+        try:
+            with open(md_filepath, 'r', encoding='utf-8') as f:
+                text = f.read()
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось прочитать текст истории:\n{e}")
+            return
+
+        if not text.strip():
+            QMessageBox.warning(self, "Внимание", "История пуста, озвучивать нечего.")
+            return
+
+        # Determine speaker based on current genre config
+        genre = self.config_manager.get("genre", "fantasy")
+        if genre in ["horror", "thriller", "noir", "military_drama", "post_apocalypse", "action", "shooter"]:
+            speaker = "aidar"
+        elif genre in ["fantasy", "scifi", "realism"]:
+            speaker = "eugene"
+        elif genre in ["comedy"]:
+            speaker = "baya"
+        else:
+            speaker = "xenia"
+
+        from PySide6.QtWidgets import QProgressDialog
+        self.tts_progress = QProgressDialog("Генерация аудио...", "Отмена", 0, 100, self)
+        self.tts_progress.setWindowTitle("Silero TTS")
+        self.tts_progress.setWindowModality(Qt.WindowModal)
+        self.tts_progress.setMinimumDuration(0)
+        self.tts_progress.setAutoClose(True)
+        self.tts_progress.setAutoReset(True)
+        self.tts_progress.setValue(0)
+
+        self.tts_worker = TTSWorker(text, md_filepath, speaker)
+        self.tts_worker.progress.connect(self.tts_progress.setValue)
+        self.tts_worker.status_update.connect(self.tts_progress.setLabelText)
+        self.tts_worker.download_requested.connect(self.on_tts_download_requested)
+        self.tts_worker.finished.connect(lambda s, m: self.on_tts_finished(s, m, btn_reference))
+
+        self.tts_progress.canceled.connect(self.tts_worker.stop)
+
+        self.tts_worker.start()
+
+    def on_tts_download_requested(self, title, message, url):
+        from PySide6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            self,
+            title,
+            message,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.tts_worker.download_response = True
+        else:
+            self.tts_worker.download_response = False
+        self.tts_worker.download_event.set()
+
+    def on_tts_finished(self, success, result, btn_reference):
+        if hasattr(self, 'tts_progress') and self.tts_progress:
+            self.tts_progress.close()
+
+        if success:
+            self.play_audio(result, btn_reference)
+        else:
+            if result != "Остановлено.":
+                QMessageBox.warning(self, "Ошибка озвучки", result)
 
     def delete_story(self):
         selected = self.list_stories.currentItem()
@@ -624,7 +770,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Внимание", "Выберите историю для удаления")
             return
 
-        filepath = os.path.join(get_path("outputs/stories"), selected.text())
+        filename = selected.data(Qt.UserRole)
+        filepath = os.path.join(get_path("outputs/stories"), filename)
+        wav_filepath = filepath.rsplit('.', 1)[0] + ".wav"
 
         reply = QMessageBox.question(
             self,
