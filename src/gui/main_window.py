@@ -842,8 +842,6 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            os.rename(old_filepath, new_filepath)
-
             # Rename associated .wav file if it exists
             old_wav_name = old_filename.rsplit('.', 1)[0] + ".wav"
             new_wav_name = f"{new_base_name}.wav"
@@ -851,7 +849,23 @@ class MainWindow(QMainWindow):
             new_wav_filepath = os.path.join(stories_dir, new_wav_name)
 
             if os.path.exists(old_wav_filepath):
+                # Check if the player is currently using this file and release it
+                current_source = self.audio_player.source().toLocalFile()
+                # Use os.path.normcase to ensure case-insensitive comparison on Windows
+                if os.path.normcase(current_source) == os.path.normcase(old_wav_filepath):
+                    self.audio_player.stop()
+                    self.audio_player.setSource(QUrl())
+                    if self.current_playing_btn:
+                        try:
+                            self.current_playing_btn.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+                        except RuntimeError:
+                            pass
+                        self.current_playing_btn = None
+
                 os.rename(old_wav_filepath, new_wav_filepath)
+
+            # Rename the .md file
+            os.rename(old_filepath, new_filepath)
 
             self.load_stories()
             self.status_bar.showMessage(f"История переименована в {new_filename}", 3000)
