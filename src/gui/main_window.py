@@ -241,7 +241,8 @@ class SettingsDialog(QDialog):
             from PySide6.QtGui import QDesktopServices
             from PySide6.QtCore import QUrl
             import os
-            cache_path = os.path.expanduser("~/.cache/huggingface/hub")
+            # Note: get_path is already imported at the top of the file, but we can just use it here or re-import
+            cache_path = get_path("models")
             os.makedirs(cache_path, exist_ok=True)
             QDesktopServices.openUrl(QUrl.fromLocalFile(cache_path))
         except Exception as e:
