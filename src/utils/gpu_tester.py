@@ -63,7 +63,7 @@ def _preload_cuda_dlls():
 
     return True, ""
 
-def test_gpu_init(model_size):
+def test_gpu_init(model_size, custom_model_path=None):
     """
     Isolated test function to try initializing the Faster Whisper engine on GPU.
     Runs in a separate process.
@@ -79,8 +79,12 @@ def test_gpu_init(model_size):
 
         from faster_whisper import WhisperModel, download_model
 
-        print(f"[Isolated GPU Test] Resolving absolute path for model '{model_size}'...")
-        model_path = download_model(model_size, local_files_only=False)
+        if custom_model_path and os.path.exists(custom_model_path) and len(os.listdir(custom_model_path)) > 0:
+            print(f"[Isolated GPU Test] Using custom model path: {custom_model_path}")
+            model_path = custom_model_path
+        else:
+            print(f"[Isolated GPU Test] Resolving absolute path for model '{model_size}' from HF cache...")
+            model_path = download_model(model_size, local_files_only=True)
 
         print(f"[Isolated GPU Test] Attempting to load model on CUDA (float16)...")
         _ = WhisperModel(
@@ -96,8 +100,10 @@ def test_gpu_init(model_size):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python gpu_tester.py <model_size>")
+        print("Usage: python gpu_tester.py <model_size> [custom_model_path]")
         sys.exit(1)
 
     model_size = sys.argv[1]
-    test_gpu_init(model_size)
+    custom_model_path = sys.argv[2] if len(sys.argv) > 2 else None
+
+    test_gpu_init(model_size, custom_model_path)

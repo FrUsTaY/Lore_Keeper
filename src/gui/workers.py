@@ -99,6 +99,7 @@ class CaptureWorker(QThread):
     status_changed = Signal(str)
     model_load_error = Signal(str) # Special signal for hard GUI error dialogs
     transcription_error = Signal(str)
+    download_requested = Signal(str, str) # title, message
 
     def __init__(self, session_manager):
         super().__init__()
@@ -113,6 +114,7 @@ class CaptureWorker(QThread):
         if hasattr(self.trigger_manager, 'transcriber'):
             self.trigger_manager.transcriber.on_model_loaded_callback = self._on_model_loaded
             self.trigger_manager.transcriber.on_model_loading_callback = self._on_model_loading
+            self.trigger_manager.transcriber.on_download_requested_callback = self._on_download_requested
 
         self.is_running = False
 
@@ -126,6 +128,14 @@ class CaptureWorker(QThread):
     def _on_model_loading(self, message):
         self.status_changed.emit(message)
 
+    def _on_download_requested(self, title, message):
+        self.download_requested.emit(title, message)
+
+    def set_download_response(self, response):
+        if hasattr(self.trigger_manager, 'transcriber') and self.trigger_manager.transcriber.local_transcriber:
+            self.trigger_manager.transcriber.local_transcriber.download_response = response
+            self.trigger_manager.transcriber.local_transcriber.download_event.set()
+
     def _on_model_loaded(self, success, message):
         if success:
             self.status_changed.emit(f"Recording ({message})")
@@ -133,7 +143,7 @@ class CaptureWorker(QThread):
             # If it's a hard error (fallback is disabled), we want to emit an error specifically
             # to be caught by the main window to show a MessageBox, or update status bar
             self.status_changed.emit(f"Ошибка Whisper: {message}")
-            if "Fallback to CPU is disabled" in message:
+            if "Fallback to CPU is disabled" in message or "отменена пользователем" in message:
                 self.model_load_error.emit(message)
 
     def run(self):

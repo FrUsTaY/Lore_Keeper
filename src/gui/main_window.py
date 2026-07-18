@@ -616,6 +616,7 @@ class MainWindow(QMainWindow):
             self.capture_worker.status_changed.connect(self.status_bar.showMessage)
             self.capture_worker.model_load_error.connect(self.on_model_load_error)
             self.capture_worker.transcription_error.connect(self.on_transcription_error)
+            self.capture_worker.download_requested.connect(self.on_download_requested)
             self.capture_worker.start()
         except Exception as e:
             self.btn_start.setEnabled(True)
@@ -625,8 +626,29 @@ class MainWindow(QMainWindow):
 
     @Slot(str)
     def on_model_load_error(self, error_msg):
-        # We stop recording immediately since GPU failed and CPU fallback was disabled
+        # We stop recording immediately since GPU failed and CPU fallback was disabled or user cancelled
         self.stop_recording()
+
+        # Check if the session file is empty (only has the "--- Начало сессии ---" event we appended in UI)
+        # Actually session_manager.get_all_sessions() returns the session with event_count
+        # We can clean up empty sessions
+        try:
+            sessions = self.session_manager.get_all_sessions()
+            if sessions:
+                latest_session = sessions[0] # assuming sorted by descending time
+                if latest_session['event_count'] == 0:
+                    filepath = latest_session['file']
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                    from PySide6.QtCore import QTimer
+                    QTimer.singleShot(600, self.load_sessions)
+        except Exception as e:
+            print(f"Error cleaning up empty session on error: {e}")
+
+        if "отменена пользователем" in error_msg:
+            # We don't need a critical popup for a user cancellation, just status bar update
+            self.status_bar.showMessage("Запись отменена.", 3000)
+            return
 
         if "Missing DLL: cublas64_12.dll" in error_msg or "Missing DLL: cudnn" in error_msg or "nvcuda.dll not found" in error_msg or "GPU initialization failed" in error_msg:
             reply = QMessageBox.question(
@@ -689,6 +711,18 @@ class MainWindow(QMainWindow):
     def on_new_event(self, timestamp, text):
         time_str = timestamp.split("T")[-1][:8]
         self.text_live_log.append(f"[{time_str}] {text}")
+
+    @Slot(str, str)
+    def on_download_requested(self, title, message):
+        reply = QMessageBox.question(
+            self,
+            title,
+            message,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if self.capture_worker:
+            self.capture_worker.set_download_response(reply == QMessageBox.Yes)
 
     @Slot(str)
     def on_transcription_error(self, error_msg):
