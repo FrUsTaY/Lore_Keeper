@@ -190,7 +190,14 @@ class TTSWorker(QThread):
 
     def run(self):
         try:
-            import torch
+            try:
+                import torch
+            except ImportError as e:
+                print(f"[TTSWorker] Ошибка импорта torch: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
+
             import requests
             from src.utils.path_utils import get_path
 
@@ -306,14 +313,22 @@ class TTSWorker(QThread):
             # Concatenate chunks
             final_audio = torch.cat(audio_chunks, dim=0)
 
-            # Save wav
+            # Save wav using soundfile to avoid torchaudio backend codec issues on Windows
             output_wav = self.md_filepath.rsplit('.', 1)[0] + ".wav"
-            import torchaudio
-            torchaudio.save(output_wav, final_audio.unsqueeze(0), sample_rate)
+            import soundfile as sf
+
+            # Convert torch tensor to numpy array (1D)
+            audio_numpy = final_audio.numpy()
+
+            # Write to disk
+            sf.write(output_wav, audio_numpy, sample_rate)
 
             self.finished.emit(True, output_wav)
 
         except Exception as e:
+            print(f"[TTSWorker] Ошибка генерации аудио: {e}")
+            import traceback
+            traceback.print_exc()
             self.finished.emit(False, f"Ошибка генерации аудио: {e}")
 
 
