@@ -20,6 +20,7 @@ from src.session_manager import SessionManager
 
 class StoryItemWidget(QWidget):
     play_clicked = Signal(str, QPushButton) # filepath, button reference
+    rename_requested = Signal(str, str) # old_filename, new_base_name
 
     def __init__(self, filename, filepath, parent=None):
         super().__init__(parent)
@@ -28,17 +29,57 @@ class StoryItemWidget(QWidget):
         self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(5, 2, 5, 2)
 
-        self.label = QLabel(filename)
+        self.base_name = filename.rsplit('.', 1)[0] if filename.endswith('.md') else filename
+
+        self.label = QLabel(self.base_name)
+        self.edit = QLineEdit(self.base_name)
+        self.edit.hide()
+
         self.btn_play = QPushButton()
         self.btn_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
         self.btn_play.setToolTip("Озвучить (Play/Stop)")
         self.btn_play.setFixedSize(24, 24)
 
         self.layout.addWidget(self.label)
+        self.layout.addWidget(self.edit)
         self.layout.addStretch()
         self.layout.addWidget(self.btn_play)
 
         self.btn_play.clicked.connect(self._on_play)
+        self.edit.editingFinished.connect(self._on_edit_finished)
+        self.edit.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if obj == self.edit and event.type() == event.Type.KeyPress:
+            if event.key() == Qt.Key_Escape:
+                self.edit.hide()
+                self.label.show()
+                self.edit.setText(self.base_name)
+                return True
+        return super().eventFilter(obj, event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.start_editing()
+        super().mouseDoubleClickEvent(event)
+
+    def start_editing(self):
+        self.label.hide()
+        self.edit.setText(self.base_name)
+        self.edit.show()
+        self.edit.setFocus()
+        self.edit.selectAll()
+
+    def _on_edit_finished(self):
+        if not self.edit.isVisible():
+            return
+        self.edit.hide()
+        self.label.show()
+        new_name = self.edit.text().strip()
+        if new_name and new_name != self.base_name:
+            self.rename_requested.emit(self.filename, new_name)
+        else:
+            self.edit.setText(self.base_name)
 
     def _on_play(self):
         self.play_clicked.emit(self.filepath, self.btn_play)
@@ -543,6 +584,11 @@ class MainWindow(QMainWindow):
         self.list_stories.itemClicked.connect(self.load_story_text)
 
         self.list_stories.setContextMenuPolicy(Qt.ActionsContextMenu)
+
+        rename_story_action = QAction("Переименовать", self)
+        rename_story_action.triggered.connect(self._trigger_rename_story)
+        self.list_stories.addAction(rename_story_action)
+
         del_story_action = QAction("Удалить", self)
         del_story_action.setShortcut("Delete")
         del_story_action.triggered.connect(self.delete_story)
@@ -637,6 +683,14 @@ class MainWindow(QMainWindow):
             item.setData(Qt.UserRole, s['file'])
             self.list_sessions.addItem(item)
 
+    def _trigger_rename_story(self):
+        selected = self.list_stories.currentItem()
+        if not selected:
+            return
+        widget = self.list_stories.itemWidget(selected)
+        if widget and isinstance(widget, StoryItemWidget):
+            widget.start_editing()
+
     def load_stories(self):
         self.list_stories.clear()
         stories_dir = get_path("outputs/stories")
@@ -648,6 +702,7 @@ class MainWindow(QMainWindow):
 
                 widget = StoryItemWidget(f, filepath)
                 widget.play_clicked.connect(self.toggle_story_audio)
+                widget.rename_requested.connect(self.rename_story)
 
                 item.setSizeHint(widget.sizeHint())
                 item.setData(Qt.UserRole, f)
@@ -763,6 +818,45 @@ class MainWindow(QMainWindow):
         else:
             if result != "Остановлено.":
                 QMessageBox.warning(self, "Ошибка озвучки", result)
+
+    def rename_story(self, old_filename, new_base_name):
+        import re
+        if not new_base_name:
+            QMessageBox.warning(self, "Ошибка", "Имя файла не может быть пустым.")
+            return
+
+        if re.search(r'[\\/:*?"<>|]', new_base_name):
+            QMessageBox.warning(self, "Ошибка", "Имя файла содержит недопустимые символы: \\ / : * ? \" < > |")
+            return
+
+        new_filename = f"{new_base_name}.md"
+        if new_filename == old_filename:
+            return
+
+        stories_dir = get_path("outputs/stories")
+        old_filepath = os.path.join(stories_dir, old_filename)
+        new_filepath = os.path.join(stories_dir, new_filename)
+
+        if os.path.exists(new_filepath):
+            QMessageBox.warning(self, "Ошибка", f"Файл с именем {new_filename} уже существует.")
+            return
+
+        try:
+            os.rename(old_filepath, new_filepath)
+
+            # Rename associated .wav file if it exists
+            old_wav_name = old_filename.rsplit('.', 1)[0] + ".wav"
+            new_wav_name = f"{new_base_name}.wav"
+            old_wav_filepath = os.path.join(stories_dir, old_wav_name)
+            new_wav_filepath = os.path.join(stories_dir, new_wav_name)
+
+            if os.path.exists(old_wav_filepath):
+                os.rename(old_wav_filepath, new_wav_filepath)
+
+            self.load_stories()
+            self.status_bar.showMessage(f"История переименована в {new_filename}", 3000)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось переименовать файл:\n{e}")
 
     def delete_story(self):
         selected = self.list_stories.currentItem()
