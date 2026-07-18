@@ -272,8 +272,18 @@ class TTSWorker(QThread):
 
             # Clean text (remove some markdown that might trip up TTS)
             import re
-            clean_text = re.sub(r'[#*_`~>\[\]\(\)]', '', self.text)
+            clean_text = re.sub(r'[#*_`~>\[\]\(\)\-\=]', '', self.text)
             clean_text = re.sub(r'\n+', ' ', clean_text)
+
+            # Silero RU model fails with ValueError if it encounters english letters or foreign symbols.
+            # We keep only cyrillic, numbers, standard punctuation, and spaces.
+            # This regex allows:
+            # - Russian letters (а-яА-ЯёЁ)
+            # - Numbers (0-9)
+            # - Basic punctuation (. , ! ? : ; " ' -)
+            # - Whitespace (\s)
+            clean_text = re.sub(r'[^а-яА-ЯёЁ0-9\s.,!?:;"\'-]', '', clean_text)
+
             clean_text = clean_text.strip()
 
             # Silero v4 typically handles ~1000 chars per pass. We might need to chunk.
