@@ -188,33 +188,60 @@ class LocalWhisperTranscriber:
             }
         }
 
-        repo_id = f"Systran/faster-whisper-{self.model_size}" if engine_type == "gpu" else "ggerganov/whisper.cpp"
+        if engine_type == "gpu":
+            if self.model_size == "large-v3-turbo":
+                repo_id = "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
+            else:
+                repo_id = f"Systran/faster-whisper-{self.model_size}"
+        else:
+            repo_id = "ggerganov/whisper.cpp"
+
         size_mb = sizes_mb.get(engine_type, {}).get(self.model_size, 1500)
 
-        print(f"[Local Whisper Adapter] Checking if {engine_type} model {self.model_size} exists in cache...")
-        fs = HfFileSystem()
+        print(f"[Local Whisper Adapter] Checking if {engine_type} model {self.model_size} exists in cache or custom model path...")
+        from src.utils.path_utils import get_path
+        import os
 
-        files_to_download = []
+        # First, check our custom models directory to avoid any network calls if we already downloaded it there
+        custom_model_dir = get_path(f"models/{repo_id.replace('/', '_')}")
+        is_in_custom_dir = False
+
         if engine_type == "gpu":
-            try:
-                # Get files in repo
-                repo_files = fs.ls(repo_id, detail=False)
-                for f in repo_files:
-                    filename = f.split("/")[-1]
-                    # We just need the main files, skip .gitattributes and README.md
-                    if filename in [".gitattributes", "README.md"]:
-                        continue
+            # For faster-whisper, we need specific files. model.bin is always required and large.
+            # Only consider it cached if model.bin is present to avoid partial download issues.
+            expected_files = ["model.bin"]
+            if os.path.exists(custom_model_dir):
+                files_present = os.listdir(custom_model_dir)
+                if all(ef in files_present for ef in expected_files):
+                    is_in_custom_dir = True
+                    self.custom_model_path = custom_model_dir
+        else:
+            # For whisper.cpp, it's a single file
+            expected_file = f"ggml-{self.model_size}.bin"
+            if os.path.exists(custom_model_dir) and expected_file in os.listdir(custom_model_dir):
+                is_in_custom_dir = True
+                self.custom_model_path = custom_model_dir
 
-                    try:
-                        # try to get from cache
-                        hf_hub_download(repo_id=repo_id, filename=filename, local_files_only=True)
-                    except Exception:
-                        # file not in cache
-                        files_to_download.append(filename)
-            except Exception as e:
-                print(f"[Local Whisper Adapter] Could not list repo: {e}. Will attempt standard download.")
-                # We can't check easily, just let it proceed to standard faster-whisper logic which might block
-                pass
+        if is_in_custom_dir:
+            print("[Local Whisper Adapter] Model found in custom models folder.")
+            return True
+
+        # If not in custom directory, check HuggingFace standard cache without network calls
+        files_to_download = []
+        cache_check_failed = False
+
+        # Determine expected files for HF cache check
+        if engine_type == "gpu":
+            if self.model_size == "large-v3-turbo":
+                expected_files = ['config.json', 'model.bin', 'preprocessor_config.json', 'tokenizer.json', 'vocabulary.json']
+            else:
+                expected_files = ['config.json', 'model.bin', 'tokenizer.json', 'vocabulary.txt']
+
+            for filename in expected_files:
+                try:
+                    hf_hub_download(repo_id=repo_id, filename=filename, local_files_only=True)
+                except Exception:
+                    files_to_download.append(filename)
         else:
             filename = f"ggml-{self.model_size}.bin"
             try:
@@ -223,10 +250,10 @@ class LocalWhisperTranscriber:
                 files_to_download.append(filename)
 
         if not files_to_download:
-            print("[Local Whisper Adapter] Model already fully cached.")
+            print("[Local Whisper Adapter] Model already fully in HuggingFace cache.")
             return True
 
-        print(f"[Local Whisper Adapter] Model not found in cache. Requesting permission to download ~{size_mb} MB.")
+        print(f"[Local Whisper Adapter] Model not found locally. Requesting permission to download ~{size_mb} MB.")
 
         self.download_event.clear()
         self.download_response = False
@@ -245,10 +272,9 @@ class LocalWhisperTranscriber:
         self.signals.model_loading.emit("Скачивание модели... (может занять время)")
 
         # Now perform the actual download showing progress
-        try:
-            total_size = sum([fs.info(f"{repo_id}/{f}")["size"] for f in files_to_download])
-        except Exception:
-            total_size = size_mb * 1024 * 1024
+
+        # We removed network-dependent cache_check_failed. We use hardcoded size for total_size.
+        total_size = size_mb * 1024 * 1024
 
         downloaded_bytes = 0
 
@@ -358,6 +384,8 @@ class LocalWhisperTranscriber:
                         )
                         if result.returncode == 0:
                             print("[Local Whisper Adapter] Isolated test passed. Selecting FasterWhisperEngine (GPU mode) in main process.")
+                            # Pass custom_model_path if we successfully did a custom download, otherwise pass None
+                            # If cache_check_failed fell back to standard download, custom_model_path will hold standard string path
                             self.engine = FasterWhisperEngine(self.model_size, getattr(self, 'custom_model_path', None))
                             try:
                                 self.engine.load()
@@ -394,6 +422,7 @@ class LocalWhisperTranscriber:
 
                 if not cuda_available or self.device == 'cpu':
                     print("[Local Whisper Adapter] Selecting WhisperCppEngine (CPU mode).")
+
                     self.engine = WhisperCppEngine(self.model_size, getattr(self, 'custom_model_path', None))
 
                     if self.device == 'auto' and cuda_error_msg:

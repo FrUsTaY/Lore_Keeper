@@ -143,7 +143,7 @@ class CaptureWorker(QThread):
             # If it's a hard error (fallback is disabled), we want to emit an error specifically
             # to be caught by the main window to show a MessageBox, or update status bar
             self.status_changed.emit(f"Ошибка Whisper: {message}")
-            if "Fallback to CPU is disabled" in message:
+            if "Fallback to CPU is disabled" in message or "отменена пользователем" in message:
                 self.model_load_error.emit(message)
 
     def run(self):
