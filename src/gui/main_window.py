@@ -72,9 +72,35 @@ class SettingsDialog(QDialog):
         llm_layout.addRow(self.groq_model_label, self.groq_model_input)
 
         self.genre_combo = QComboBox()
-        self.genre_combo.addItems(["fantasy", "cyberpunk", "realism", "horror"])
-        self.genre_combo.setCurrentText(self.config_manager.get("genre", "fantasy"))
+        self.genres_map = {}
+        try:
+            import json
+            from src.utils.path_utils import get_path
+            with open(get_path("configs/genres.json"), 'r', encoding='utf-8') as f:
+                genres_data = json.load(f)
+                for key, data in genres_data.items():
+                    name = data.get("name", key)
+                    self.genres_map[name] = key
+                    self.genre_combo.addItem(name)
+        except Exception as e:
+            print(f"Error loading genres in GUI: {e}")
+            self.genres_map = {"Фэнтези": "fantasy", "Киберпанк": "cyberpunk"}
+            self.genre_combo.addItems(list(self.genres_map.keys()))
+
+        current_genre_key = self.config_manager.get("genre", "fantasy")
+        # Find the name corresponding to the key
+        current_genre_name = next((name for name, key in self.genres_map.items() if key == current_genre_key), "Фэнтези")
+        self.genre_combo.setCurrentText(current_genre_name)
         llm_layout.addRow("Жанр по умолчанию:", self.genre_combo)
+
+        # Temperature slider
+        from PySide6.QtWidgets import QDoubleSpinBox
+        self.temperature_spinbox = QDoubleSpinBox()
+        self.temperature_spinbox.setRange(0.0, 2.0)
+        self.temperature_spinbox.setSingleStep(0.1)
+        self.temperature_spinbox.setValue(self.config_manager.get("temperature", 1.0))
+        self.temperature_spinbox.setToolTip("Креативность (Temperature): от 0.0 до 2.0. Чем больше, тем креативнее.")
+        llm_layout.addRow("Креативность (Temperature):", self.temperature_spinbox)
 
         llm_group.setLayout(llm_layout)
         main_layout.addWidget(llm_group)
@@ -269,7 +295,13 @@ class SettingsDialog(QDialog):
         config["api_url"] = self.url_input.text()
         config["groq_token"] = self.groq_token_input.text()
         config["groq_model"] = self.groq_model_input.text()
-        config["genre"] = self.genre_combo.currentText()
+
+        # Save genre key, not name
+        selected_name = self.genre_combo.currentText()
+        config["genre"] = self.genres_map.get(selected_name, "fantasy")
+
+        config["temperature"] = self.temperature_spinbox.value()
+
         config["save_screenshots"] = self.save_screenshots_cb.isChecked()
         config["screenshots_path"] = self.screenshots_path_input.text()
         config["audio_provider"] = self.audio_provider_combo.currentText()
