@@ -428,7 +428,13 @@ class MainWindow(QMainWindow):
         sess_layout = QVBoxLayout(self.tab_sessions)
         self.list_sessions = QListWidget()
 
+        self.list_sessions.itemDoubleClicked.connect(self.edit_session)
         self.list_sessions.setContextMenuPolicy(Qt.ActionsContextMenu)
+
+        edit_sess_action = QAction("Редактировать", self)
+        edit_sess_action.triggered.connect(self.edit_session)
+        self.list_sessions.addAction(edit_sess_action)
+
         del_sess_action = QAction("Удалить", self)
         del_sess_action.setShortcut("Delete")
         del_sess_action.triggered.connect(self.delete_session)
@@ -437,11 +443,15 @@ class MainWindow(QMainWindow):
         btn_generate = QPushButton("Сгенерировать историю из выбранной сессии")
         btn_generate.clicked.connect(self.start_generation)
 
+        btn_edit_session = QPushButton("Редактировать выбранную сессию")
+        btn_edit_session.clicked.connect(self.edit_session)
+
         btn_delete_session = QPushButton("Удалить выбранную сессию")
         btn_delete_session.clicked.connect(self.delete_session)
 
         sess_buttons_layout = QHBoxLayout()
         sess_buttons_layout.addWidget(btn_generate)
+        sess_buttons_layout.addWidget(btn_edit_session)
         sess_buttons_layout.addWidget(btn_delete_session)
 
         sess_layout.addWidget(QLabel("Сохраненные сессии:"))
@@ -747,6 +757,25 @@ class MainWindow(QMainWindow):
                 import logging
                 logging.info(f"Динамически обновлена минимальная громкость: {new_volume} dB")
                 print(f"Динамически обновлена минимальная громкость: {new_volume} dB")
+
+    def edit_session(self):
+        selected = self.list_sessions.currentItem()
+        if not selected:
+            QMessageBox.warning(self, "Внимание", "Выберите сессию для редактирования")
+            return
+
+        filepath = selected.data(Qt.UserRole)
+        if not os.path.exists(filepath):
+            QMessageBox.warning(self, "Внимание", f"Файл сессии не найден:\n{filepath}")
+            return
+
+        from src.gui.session_editor_dialog import SessionEditorDialog
+        dialog = SessionEditorDialog(filepath, self)
+        # We use exec() so it blocks MainWindow while editing
+        dialog.exec()
+
+        # Reload sessions to reflect potentially changed event count or file modification time
+        self.load_sessions()
 
     def delete_session(self):
         selected = self.list_sessions.currentItem()
