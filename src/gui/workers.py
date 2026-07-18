@@ -112,6 +112,7 @@ class CaptureWorker(QThread):
         # Attach callback for local whisper signal
         if hasattr(self.trigger_manager, 'transcriber'):
             self.trigger_manager.transcriber.on_model_loaded_callback = self._on_model_loaded
+            self.trigger_manager.transcriber.on_model_loading_callback = self._on_model_loading
 
         self.is_running = False
 
@@ -121,6 +122,9 @@ class CaptureWorker(QThread):
 
     def _on_transcription_error(self, error_msg):
         self.transcription_error.emit(error_msg)
+
+    def _on_model_loading(self, message):
+        self.status_changed.emit(message)
 
     def _on_model_loaded(self, success, message):
         if success:
@@ -134,7 +138,7 @@ class CaptureWorker(QThread):
 
     def run(self):
         self.is_running = True
-        self.status_changed.emit("Recording")
+        self.status_changed.emit("Инициализация захвата...")
         try:
             self.trigger_manager.start()
         except Exception as e:

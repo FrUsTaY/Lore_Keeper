@@ -65,7 +65,7 @@ class GroqClient:
         delay = 2
         for attempt in range(retries):
             try:
-                response = requests.post(self.api_url, headers=headers, json=payload, timeout=self.timeout)
+                response = requests.post(self.api_url, headers=headers, json=payload, timeout=None)
                 response.raise_for_status()
                 data = response.json()
 
@@ -131,7 +131,7 @@ class GroqClient:
                     files = {"file": (file_path, f, "audio/wav")}
                     data = {"model": model_name}
 
-                    response = requests.post(url, headers=headers, files=files, data=data, timeout=self.timeout)
+                    response = requests.post(url, headers=headers, files=files, data=data, timeout=None)
                     response.raise_for_status()
 
                     result = response.json()
