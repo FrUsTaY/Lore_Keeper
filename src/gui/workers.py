@@ -138,7 +138,7 @@ class CaptureWorker(QThread):
 
     def run(self):
         self.is_running = True
-        self.status_changed.emit("Recording")
+        self.status_changed.emit("Инициализация захвата...")
         try:
             self.trigger_manager.start()
         except Exception as e:

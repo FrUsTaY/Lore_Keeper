@@ -175,6 +175,7 @@ class LocalWhisperTranscriber:
 
         def load_task():
             print(f"[Local Whisper Adapter] Starting initialization for model size '{self.model_size}' (device={self.device})...")
+            self.signals.model_loading.emit("Инициализация локальной модели (ожидание)...")
 
             try:
                 cuda_available = False
