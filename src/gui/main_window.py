@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QApplication, QListWidgetItem, QSlider
 )
 from PySide6.QtCore import Qt, Slot, Signal
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QKeyEvent
 from PySide6.QtWidgets import QStyle
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtCore import QUrl
@@ -51,7 +51,7 @@ class StoryItemWidget(QWidget):
 
     def eventFilter(self, obj, event):
         if obj == self.edit and event.type() == event.Type.KeyPress:
-            if event.key() == Qt.Key_Escape:
+            if isinstance(event, QKeyEvent) and event.key() == Qt.Key_Escape:
                 self.edit.hide()
                 self.label.show()
                 self.edit.setText(self.base_name)
