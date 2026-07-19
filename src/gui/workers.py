@@ -302,6 +302,12 @@ class TTSWorker(QThread):
                 sent = sent.strip()
                 if not sent:
                     continue
+
+                # Silero RU requires at least one Cyrillic character to pronounce something.
+                # If a sentence is just numbers, spaces, or punctuation, it will raise ValueError.
+                if not re.search(r'[а-яА-ЯёЁ]', sent):
+                    continue
+
                 # If a sentence is somehow still > 1000 chars, chunk it by commas or spaces
                 while len(sent) > 900:
                     part = sent[:900]
