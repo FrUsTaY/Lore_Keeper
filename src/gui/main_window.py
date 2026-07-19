@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QApplication, QListWidgetItem, QSlider
 )
 from PySide6.QtCore import Qt, Slot, Signal
-from PySide6.QtGui import QAction, QKeyEvent
+from PySide6.QtGui import QAction, QKeyEvent, QIcon
 from PySide6.QtWidgets import QStyle
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtCore import QUrl
@@ -530,6 +530,11 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(toolbar_layout)
 
         # Tabs
+        # Window icon
+        icon_path = get_path("icon.ico")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+
         self.tabs = QTabWidget()
 
         # Tab 1: Sessions
@@ -627,8 +632,11 @@ class MainWindow(QMainWindow):
 
     def setup_tray(self):
         self.tray_icon = QSystemTrayIcon(self)
-        # Note: We need a real icon in a real app, using default empty icon for MVP
-        self.tray_icon.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
+        icon_path = get_path("icon.ico")
+        if os.path.exists(icon_path):
+            self.tray_icon.setIcon(QIcon(icon_path))
+        else:
+            self.tray_icon.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
 
         tray_menu = QMenu()
 
