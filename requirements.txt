@@ -15,6 +15,7 @@ keyboard==0.13.5
 pywhispercpp>=1.5.0
 huggingface_hub>=0.23.0
 scipy>=1.10.0
-torch==2.5.1
+torch==2.13.0
+#Если собирать .exe, то необходимо указать torch==2.5.1 (но тогда не работает воспроизведение аудио историй)
 torchaudio>=2.0.0
 omegaconf>=2.3.0
